@@ -15,6 +15,31 @@ fail() {
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || fail "requires Ubuntu 24.04"
 
+# Harden the known runner image layout before dpkg writes below /opt.
+stage='verify /opt before hardening on the disposable runner'
+[[ -d /opt && ! -L /opt && $(readlink -f -- /opt) == /opt ]] ||
+  fail 'expected /opt to be a real directory'
+root_metadata=$(stat -c '%u %a' -- /)
+read -r root_uid root_mode <<< "$root_metadata"
+[[ $root_uid == 0 ]] && (( (8#$root_mode & 0022) == 0 )) ||
+  fail 'expected / to be root-owned and not writable by group or other users'
+opt_metadata=$(stat -c '%u %g %a' -- /opt)
+read -r opt_uid opt_gid opt_mode <<< "$opt_metadata"
+printf 'Edge setup: /opt before hardening uid=%s gid=%s mode=%s\n' "$opt_uid" "$opt_gid" "$opt_mode"
+[[ $opt_uid == 0 ]] || fail 'expected /opt to be owned by root'
+if [[ $opt_mode == 777 ]]; then
+  stage='harden /opt on the disposable runner'
+  sudo chmod 0755 -- /opt
+fi
+stage='verify hardened /opt'
+[[ -d /opt && ! -L /opt && $(readlink -f -- /opt) == /opt ]] ||
+  fail 'expected /opt to remain a real directory'
+opt_metadata=$(stat -c '%u %a' -- /opt)
+read -r opt_uid opt_mode <<< "$opt_metadata"
+[[ $opt_uid == 0 ]] && (( (8#$opt_mode & 0022) == 0 )) ||
+  fail 'expected /opt to be root-owned and not writable by group or other users'
+printf 'Edge setup: /opt verified uid=%s mode=%s\n' "$opt_uid" "$opt_mode"
+
 stage='create package workspace'
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT

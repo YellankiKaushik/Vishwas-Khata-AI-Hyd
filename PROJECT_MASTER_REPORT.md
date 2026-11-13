@@ -4,6 +4,31 @@ Updated 13 November 2026 (IST). The sections below record this implementation pa
 
 ## Current executive status
 
+The published hackathon main release is 482e80a98a770b6e09786d52d754c4686efc6c37. [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) remains an open draft against feat/synthetic-staging-foundations. Its verified published head is a106c32e407978a8114516f81ef18bc44e8bcfc8. This repair is a direct child on feat/hosted-synthetic-parity and requires a new acceptance run after publication.
+
+| Job in [run 43411694142](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43411694142) | Observed result |
+| --- | --- |
+| backend | Passed. 239 backend tests and 38 V3 reference tests passed. The V3 verifier and source scan passed. The Python audit found no known vulnerabilities. |
+| hosted-unit | Passed. All 19 tests passed on locked PGlite 0.5.16. The hosted npm audit reported zero vulnerabilities. |
+| local-edge | Edge setup failed after package installation because /opt was root-owned with mode 0777. Frontend tests, the build and Playwright were skipped. The frontend npm audit reported zero vulnerabilities. |
+| hosted-edge | Failed the same path check. PostgreSQL, HTTPS and Playwright were skipped in this run. |
+| acceptance | Failed because both mandatory Edge jobs failed. |
+
+On the Ubuntu 24.04 amd64 GitHub-hosted runner, Edge setup now verifies that / and /opt are root-owned, / is protected from group and other writes, and /opt is a genuine directory. It changes the observed mode 0777 to 0755 before the signed package installation. Setup then rechecks /opt, the installed package identity, both signed binary payloads, and all package path ownership and write permissions before enabling the root-owned sandbox helper. Unexpected writable modes fail closed. Browser sandboxing and TLS verification remain enabled.
+
+[Run 43404020255](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43404020255) remains the latest passing real PostgreSQL 17 migration and recovery evidence, including repeat migration, independent connections, role isolation, concurrency, rollback and backup/restore. It also passed the loopback HTTPS API acceptance with the complete ₹500 → ₹300 → ₹200 → ₹700 financial journey and stale-draft rejection, 11 frontend unit tests and the production build. The full local and hosted Edge suites still require a successful CI run with this correction.
+
+Public demo status is NOT_DEPLOYED. Hosted preflight remains closed pending acceptance and deployment evidence. The public preview requires authorized access to an approved Node-capable HTTPS service and a dedicated synthetic PostgreSQL project with separate migration and runtime credentials. Configure credentials through the providers' private settings.
+
+V3 cases EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079 remain open. The assistant remains deterministic, and live AI and speech require separate approval and verification. Paytm remains at synthetic contract testing.
+
+
+Local verification passed the release and source scan and 19 supplemental hosted tests with cached PGlite 0.5.12. The managed Windows shell blocked Git Bash before it could run the updated script's syntax check. The backend job checks shell syntax on Ubuntu.
+
+## Historical CI and release evidence
+
+### Edge package diagnostics in run 43409543864
+
 GitHub main remains 482e80a98a770b6e09786d52d754c4686efc6c37. [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) is an open draft against staging. The last verified published head is e02f52b3806bba79ad5f3b200aae6d6d177dbf47. The correction containing this entry is its direct fast-forward child.
 
 | Job in [run 43409543864](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43409543864) | Observed result |
@@ -26,9 +51,7 @@ V3 cases EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079 remain open. The Engl
 
 The next action is to publish the reviewed fast-forward to the existing draft branch so GitHub Actions can run. Public preview will then require access to an approved Node-capable HTTPS service and a dedicated synthetic PostgreSQL project with separate runtime and migration credentials. Configure secrets through the provider's private environment.
 
-## Historical CI and release evidence
-
-## Latest executive status
+### Initial PostgreSQL and HTTPS evidence in run 43404020255
 
 GitHub main is 482e80a98a770b6e09786d52d754c4686efc6c37. PR #1 is merged with maintainer attribution verified. The stable venue demo and its SQLite migrations are preserved. [Draft PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) targets staging. Its last observed published head is b1e0670cc65a8b082ec186fffba2393977b6bbef. The correction in this report's commit is a fast-forward child of that head.
 
