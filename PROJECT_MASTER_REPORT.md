@@ -2,6 +2,32 @@
 
 Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
+## Current executive status
+
+GitHub main remains 482e80a98a770b6e09786d52d754c4686efc6c37. [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) is an open draft against staging. The last verified published head is e02f52b3806bba79ad5f3b200aae6d6d177dbf47. The correction containing this entry is its direct fast-forward child.
+
+| Job in [run 43409543864](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43409543864) | Observed result |
+| --- | --- |
+| backend | Success. 239 backend and 38 V3 reference tests passed, along with the V3 verifier and source scan. Python 3.12.16, pip 26.3, FastAPI 0.162.0, pytest 9.2.0 and pip_audit 2.10.1. Python audit reported no known vulnerabilities. |
+| hosted-unit | Success. 19 tests passed on locked PGlite 0.5.16 with pg 8.23.1, Node 24.16.0 and npm 11.13.0. Hosted npm audit reported zero vulnerabilities. |
+| local-edge | Failed in Edge setup, before frontend install, build or Playwright. The frontend npm audit reported zero vulnerabilities. |
+| hosted-edge | Failed in the same setup step. PostgreSQL, HTTPS and Playwright were not run in this cycle. |
+| acceptance | Failed because both mandatory Edge jobs failed. |
+
+Both complete Edge job logs show Microsoft's signed microsoft-edge-stable 157.0.4341.57-1 package being installed and the script exiting 1 after man-db triggers. The prior script emitted no per-check diagnostics, so the exact failing assertion and the old runner's on-disk modes cannot be established from that run. Microsoft's package index and the documented Linux sandbox helper location were checked. Local inspection of the downloaded Linux package and its ownership was unavailable in this managed Windows environment.
+
+Edge setup now reports each failed validation or command with its stage and source line. It checks installed package status, version and architecture. It accepts either exact dpkg owner spelling, with or without amd64 qualification, for both installed files. It rejects symlinks and checks their signed payload bytes before setting mode 4755. Root ownership and absence of group or other write permissions remain required for every path component. A nonroot group on a nonwritable ancestor is accepted, while the setuid helper itself must be root:root. The script reads the version directly from the verified binary. The four-job workflow keeps the same final acceptance gate and now checks shell syntax on the backend runner independently of Edge installation.
+
+Local verification passed 48 provider/reference tests, 19 supplemental hosted tests with cached PGlite 0.5.12, and the release source scan. Local Git Bash was blocked by Windows managed-process error 0xC0000022 before it could run bash -n. The next CI run must exercise the new Edge setup, full local Edge suite and hosted Edge journey. No browser assertions or release gates were weakened.
+
+The preceding run 43404020255 is still the real PostgreSQL 17 migration, recovery and HTTPS API witness. It verified the signed financial journey, isolation, conflicting retries, stale drafts, request limits and expired sessions against PostgreSQL. That run also passed 11 frontend tests and the Vite build. Neither run passed hosted Edge browser acceptance. Public preflight still exits 1 and no public HTTPS URL exists.
+
+V3 cases EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079 remain open. The English assistant remains deterministic; live AI and speech require separate approval and language verification. Paytm remains synthetic contract testing. No commercial pilot or real integrations are authorized.
+
+The next action is to publish the reviewed fast-forward to the existing draft branch so GitHub Actions can run. Public preview will then require access to an approved Node-capable HTTPS service and a dedicated synthetic PostgreSQL project with separate runtime and migration credentials. Configure secrets through the provider's private environment.
+
+## Historical CI and release evidence
+
 ## Latest executive status
 
 GitHub main is 482e80a98a770b6e09786d52d754c4686efc6c37. PR #1 is merged with maintainer attribution verified. The stable venue demo and its SQLite migrations are preserved. [Draft PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) targets staging. Its last observed published head is b1e0670cc65a8b082ec186fffba2393977b6bbef. The correction in this report's commit is a fast-forward child of that head.

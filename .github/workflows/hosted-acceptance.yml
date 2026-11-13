@@ -32,6 +32,8 @@ jobs:
           .venv/bin/python --version
           .venv/bin/python -m pip --version
           .venv/bin/python -m pip show fastapi pytest pip_audit
+      - name: Verify Edge setup shell syntax
+        run: bash -n scripts/setup_ci_edge.sh
       - name: Verify backend and reference contracts
         run: |
           .venv/bin/python -X utf8 -m pytest -q tests
