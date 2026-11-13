@@ -39,7 +39,7 @@
     "Project_Vishwas_Khata_V3/verification/V2_TO_V3_AUDIT.md": "faf2833052c7990c9c7b3f46c0da0aa8396d311b3f967b450c2741a2b243ec0f",
     "Project_Vishwas_Khata_V3/verification/V3_STATIC_AUDIT_RESULTS.txt": "cef9892ebe363d03894010217725c35832ce7fa115a7f89c5a0341628ab42bc5",
     "Project_Vishwas_Khata_V3/verification/verify_v3.py": "cdfc61b4f9be4548d9746f84cbcc762e53b44a453574a3652ff5d335d50e08a5",
-    "README.md": "8d695576215400a5b3c63a343c8545c8077a0f22de07d45f6518b4ccd4c94b27",
+    "README.md": "c92ef1acc592dc98e2436387c4bdf1a9068e7dfa811c8e0af66e6268b290aa52",
     "apps/api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "apps/api/analytics.py": "1d5ab5748533f10012291e7d9e76f6d451f9992e6dcbbf0def515b8ee31a1286",
     "apps/api/assistant.py": "a22eaafbaaa9b0b9d37e1192e2925e59d25e2136242bd898739b6b72b9fcb54d",
@@ -168,5 +168,6 @@
     "tests/test_static_files.py": "c703783b04e44ae10a74587a789800e80346e7cdde6ddf32ee9663f43fa12482",
     "tests/test_voice_http.py": "53d635931336a8688721b52339d3c702ac19683c9300551033ebe0e7bf9088ab",
     "tests/test_voice_resilience.py": "5decf214c2784897ae6fd1b4a745e0257a422ddd2566d8a27543966b2bb5397e"
-  }
+  },
+  "base_snapshot_commit": "03d8192b989ae9d1da212f318ff172a919043830"
 }
