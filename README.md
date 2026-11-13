@@ -2,6 +2,12 @@
 
 A local synthetic merchant workspace for Team Tic Tac Tech's Merchant Growth AI demonstration. The existing signed SQLite journal powers repayment commitments, due-date evidence, grounded English questions and unsent follow-up drafts.
 
+Repository maintainer: [@YellankiKaushik](https://github.com/YellankiKaushik)
+
+Hackathon team: Tic Tac Tech
+
+Vishwas-Khata-AI Hyderabad is Team Tic Tac Tech's project for the Hyderabad Edition of the Paytm Build for India AI Hackathon, Track 1 (Merchant Growth AI). It builds on the earlier Vishwas-Khata codebase developed for the Bengaluru edition.
+
 ## Launch the Hyderabad demo
 
 From the repository root in Windows PowerShell, install dependencies once if needed. Then run the launcher and open the app.
