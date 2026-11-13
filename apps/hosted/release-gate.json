@@ -1,13 +1,14 @@
 {
-  "mode": "SYNTHETIC_STAGING_FOUNDATIONS_ONLY",
+  "mode": "SYNTHETIC_HOSTED_CANDIDATE",
   "public_deployment_allowed": false,
+  "restricted_vercel_preview_supported": true,
   "provider_calls_allowed": false,
   "payments_allowed": false,
   "outbound_messages_allowed": false,
   "required_before_public_deployment": [
-    "Server-derived expiring demo sessions and cross-session HTTP tests",
-    "Reviewed financial draft and exact-version confirmation API parity",
-    "Bounded HTTP API, origin checks, distributed quotas and request-size limits",
+    "Server-derived expiring demo sessions and cross-session tests through the deployed HTTP transport",
+    "Reviewed draft and exact-version confirmation parity through real PostgreSQL and the production frontend build",
+    "Transport-level input bounds, trusted ingress configuration, and distributed quotas witnessed on the target runtime",
     "Frontend-to-hosted API compatibility and complete deployed Ramesh journey",
     "Least-privilege managed PostgreSQL connection and migration witness",
     "Real multi-connection PostgreSQL concurrency, backup and recovery tests",

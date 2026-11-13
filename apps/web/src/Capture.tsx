@@ -7,6 +7,7 @@ import {
   money,
   entryLabel,
   ApiError,
+  operationStorageKey,
   type Customer,
   type Draft,
   type EntryType,
@@ -33,6 +34,7 @@ export function Capture({
   voiceAvailable = false,
   voiceLanguages = [],
   scopeId = "local-shop",
+  hosted = false,
 }: {
   customers: Customer[];
   onClose: () => void;
@@ -40,7 +42,11 @@ export function Capture({
   voiceAvailable?: boolean;
   voiceLanguages?: string[];
   scopeId?: string;
+  hosted?: boolean;
 }) {
+  const pendingKey = operationStorageKey(STORAGE, hosted, scopeId);
+  const draftKey = operationStorageKey("vishwas.draft", hosted, scopeId);
+  const receiptKey = operationStorageKey("vishwas.lastReceipt", hosted, scopeId);
   const [mode, setMode] = useState<"typed" | "sentence">("typed");
   const [cid, setCid] = useState("");
   const [kind, setKind] = useState<EntryType>("CREDIT_GIVEN");
@@ -50,7 +56,7 @@ export function Capture({
   const locale = captureLocale(language);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pending, setPending] = useState<Pending | null>(
-    stored<Pending>(STORAGE),
+    stored<Pending>(pendingKey),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -67,7 +73,7 @@ export function Capture({
   const [draftIntent, saveDraftIntent] = useSavedOperation<{
     key: string;
     body: Record<string, unknown>;
-  }>("vishwas.draft-intent.v1");
+  }>(operationStorageKey("vishwas.draft-intent.v1", hosted, scopeId));
   const name =
     customers.find((c) => c.id === (draft?.proposed.customer_id || cid))
       ?.display_name || "Select a customer";
@@ -81,17 +87,17 @@ export function Capture({
         : "",
     );
     setEditing(d.needs_review);
-    localStorage.setItem("vishwas.draft", d.draft_id);
+    localStorage.setItem(draftKey, d.draft_id);
   }
   useEffect(() => {
-    const id = pending?.draft_id || localStorage.getItem("vishwas.draft");
+    const id = pending?.draft_id || localStorage.getItem(draftKey);
     if (id) {
       setBusy(true);
       api<Draft>("/ledger/drafts/" + id)
         .then((d) => {
           adopt(d);
           if (["CANCELLED", "REJECTED", "EXPIRED"].includes(d.state)) {
-            localStorage.removeItem("vishwas.draft");
+            localStorage.removeItem(draftKey);
             if (!pending) setDraft(null);
           }
         })
@@ -171,7 +177,7 @@ export function Capture({
         version: draft.version,
         key: crypto.randomUUID(),
       };
-      localStorage.setItem(STORAGE, JSON.stringify(operation));
+      localStorage.setItem(pendingKey, JSON.stringify(operation));
       setPending(operation);
       try {
         const result = await post<Receipt>(
@@ -180,11 +186,11 @@ export function Capture({
           { "Idempotency-Key": operation.key },
         );
         localStorage.setItem(
-          "vishwas.lastReceipt",
+          receiptKey,
           JSON.stringify({ operation, result }),
         );
-        localStorage.removeItem(STORAGE);
-        localStorage.removeItem("vishwas.draft");
+        localStorage.removeItem(pendingKey);
+        localStorage.removeItem(draftKey);
         onPosted(result);
       } catch (e) {
         if (e instanceof ApiError && e.code === "ALREADY_CONFIRMED") {
@@ -192,8 +198,8 @@ export function Capture({
             "/ledger/drafts/" + operation.draft_id,
           );
           if (current.state === "CONFIRMED" && current.posted_result) {
-            localStorage.removeItem(STORAGE);
-            localStorage.removeItem("vishwas.draft");
+            localStorage.removeItem(pendingKey);
+            localStorage.removeItem(draftKey);
             onPosted(current.posted_result);
             return;
           }
@@ -211,21 +217,21 @@ export function Capture({
             "/ledger/drafts/" + operation.draft_id,
           );
           if (current.posted_result) {
-            localStorage.removeItem(STORAGE);
-            localStorage.removeItem("vishwas.draft");
+            localStorage.removeItem(pendingKey);
+            localStorage.removeItem(draftKey);
             onPosted(current.posted_result);
             return;
           }
-          localStorage.removeItem(STORAGE);
+          localStorage.removeItem(pendingKey);
           setPending(null);
           if (["EXPIRED", "CANCELLED", "REJECTED"].includes(current.state)) {
-            localStorage.removeItem("vishwas.draft");
+            localStorage.removeItem(draftKey);
             setDraft(null);
           } else adopt(current);
         }
         // Definitive validation rejection means no money posted. Transport/server uncertainty retains the exact key.
         if (e instanceof ApiError && e.status === 422) {
-          localStorage.removeItem(STORAGE);
+          localStorage.removeItem(pendingKey);
           setPending(null);
         }
         throw e;
@@ -236,7 +242,7 @@ export function Capture({
     if (!draft) return onClose();
     await run(async () => {
       await post("/ledger/drafts/" + draft.draft_id + "/cancel");
-      localStorage.removeItem("vishwas.draft");
+      localStorage.removeItem(draftKey);
       onClose();
     });
   }
@@ -309,7 +315,7 @@ export function Capture({
               </button>
             </div>
           )}
-          <div className="mode-tabs">
+          {!hosted && <div className="mode-tabs">
             <button
               className={mode === "typed" ? "active" : ""}
               onClick={() => setMode("typed")}
@@ -322,7 +328,7 @@ export function Capture({
             >
               Type / speak a sentence
             </button>
-          </div>
+          </div>}
           <form
             onSubmit={(e) => {
               e.preventDefault();
