@@ -24,9 +24,8 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:8001",
     browserName: "chromium",
-    channel: "msedge",
     headless: true,
-    launchOptions: { chromiumSandbox: true },
+    launchOptions: { chromiumSandbox: process.env.RUNNER_ENVIRONMENT !== "github-hosted" },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

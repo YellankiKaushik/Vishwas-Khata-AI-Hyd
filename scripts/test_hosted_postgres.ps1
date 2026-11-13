@@ -144,9 +144,9 @@ CREATE DATABASE hyd_restored OWNER hyd_owner;
                 Invoke-Checked certutil @('-D','-d',"sql:$nss",'-n',$container)
             }
         } else {
-            Write-Output "For Edge acceptance, trust the local certificate at $ca in the test profile before continuing."
+            Write-Output "For Chromium acceptance, trust the local certificate at $ca in the test profile before continuing."
             Write-Output "In that profile's terminal, set VISHWAS_HOSTED_TEST_URL=$env:VISHWAS_HOSTED_TEST_URL and run Playwright with playwright.hosted.config.ts from apps/web."
-            [void](Read-Host 'Press Enter after Edge acceptance to stop the disposable services')
+            [void](Read-Host 'Press Enter after Chromium acceptance to stop the disposable services')
         }
     }
 } finally {

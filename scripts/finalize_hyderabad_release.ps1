@@ -1,4 +1,5 @@
-# Run from the existing development checkout in an authenticated PowerShell.
+#Requires -Version 5.1
+# Run in an authenticated Windows PowerShell session.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedHead,
@@ -7,7 +8,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $false
+if ($PSVersionTable.PSVersion.Major -ge 7) { $PSNativeCommandUseErrorActionPreference = $false }
 
 $repo = 'YellankiKaushik/Vishwas-Khata-AI-Hyd'
 $venue = '03d8192b989ae9d1da212f318ff172a919043830'
@@ -21,7 +22,7 @@ $integration = 'release/hyderabad-integration'
 $docs = 'docs/hyderabad-maintainer'
 $tag = 'hyderabad-venue-2026-11-13'
 $workflow = 'hosted-acceptance.yml'
-$jobs = 'acceptance', 'backend', 'hosted-edge', 'hosted-unit', 'local-edge'
+$jobs = 'acceptance', 'backend', 'hosted-browser', 'hosted-unit', 'local-browser'
 $deadline = [DateTimeOffset]::UtcNow.AddMinutes($WaitMinutes)
 
 function Invoke-Git {
@@ -115,9 +116,8 @@ query($owner:String!, $name:String!, $number:Int!) {
     }
     if ($ApprovalRequired) {
         $details = Get-Api "pulls/$($Pr.number)"
-        $pages = (Invoke-Gh api --paginate --slurp "repos/$repo/pulls/$($Pr.number)/reviews?per_page=100" | Out-String) |
-            ConvertFrom-Json -NoEnumerate
-        $submissions = @($pages | ForEach-Object { $_ | Write-Output })
+        $submissions = @(Invoke-Gh api --paginate "repos/$repo/pulls/$($Pr.number)/reviews?per_page=100" --jq '.[] | @json' |
+            ForEach-Object { $_ | ConvertFrom-Json })
         $approvals = @($submissions | Where-Object { $_.user.login -ne $details.user.login -and $_.state -ne 'COMMENTED' } |
             Group-Object { $_.user.login } | ForEach-Object { $_.Group | Sort-Object id -Descending | Select-Object -First 1 } |
             Where-Object { $_.state -eq 'APPROVED' -and $_.commit_id -eq $Pr.headRefOid -and $_.author_association -in @('OWNER','MEMBER','COLLABORATOR') })
@@ -193,6 +193,7 @@ if read -r extra; then exit 1; fi
 
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
+    Assert-Same ([IO.Path]::GetFullPath((Invoke-Git rev-parse --show-toplevel))) $PWD.Path 'Development checkout root'
     Assert-Same (Invoke-Git config --get remote.origin.url) "https://github.com/$repo.git" 'Origin URL'
     Assert-Same (Invoke-Git branch --show-current) $hosted 'Local branch'
     if (Invoke-Git status --porcelain) { throw 'The development checkout must be clean.' }
@@ -204,6 +205,7 @@ try {
     Assert-Same (Invoke-Git rev-parse "refs/tags/${tag}^{commit}") $venue 'Venue tag target'
     Assert-Same (Invoke-Git rev-parse "${venue}^{tree}") 'ad842744a605517da3f4c63c9905ef781e312002' 'Frozen venue tree'
     Invoke-Gh auth status --hostname github.com | Out-Host
+    Assert-Same (Invoke-Gh api user --jq '.login') 'YellankiKaushik' 'Authenticated GitHub account'
     $metadata = (Invoke-Gh api "repos/$repo" | Out-String) | ConvertFrom-Json
     Assert-Same $metadata.default_branch 'main' 'Default branch'
     Assert-Same $metadata.allow_merge_commit $true 'Merge commits allowed'

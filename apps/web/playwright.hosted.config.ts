@@ -10,9 +10,8 @@ export default defineConfig({
   use: {
     baseURL,
     browserName: "chromium",
-    channel: "msedge",
-    launchOptions: { chromiumSandbox: true },
-    trace: "retain-on-failure",
+    launchOptions: { chromiumSandbox: process.env.RUNNER_ENVIRONMENT !== "github-hosted" },
+    trace: "off",
     screenshot: "only-on-failure",
   },
 });
