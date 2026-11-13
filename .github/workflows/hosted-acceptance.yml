@@ -1,7 +1,9 @@
 name: Hosted synthetic acceptance
 on:
   push:
-    branches: [feat/hosted-synthetic-parity]
+    branches: [main, feat/synthetic-staging-foundations, feat/hosted-synthetic-parity, release/hyderabad-integration]
+  pull_request:
+    branches: [main, feat/synthetic-staging-foundations]
   workflow_dispatch:
 
 permissions:
@@ -12,7 +14,7 @@ env:
 
 jobs:
   backend:
-    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -23,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
       - name: Install locked Python dependencies
         run: |
           mkdir -p .tmp
@@ -48,7 +52,7 @@ jobs:
           .venv/bin/python -m pip_audit -r requirements-lock.txt
 
   hosted-unit:
-    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -59,6 +63,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: apps/hosted/package-lock.json
       - name: Install locked hosted dependencies
         run: |
           node --version
@@ -73,7 +79,7 @@ jobs:
         run: npm --prefix apps/hosted audit
 
   local-edge:
-    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -86,6 +92,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
       - name: Install locked Python dependencies
         run: |
           mkdir -p .tmp
@@ -98,6 +106,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
       - name: Install locked frontend dependencies
         run: |
           npm --prefix apps/web ci
@@ -106,6 +116,8 @@ jobs:
         run: npm --prefix apps/web test
       - name: Build production frontend
         run: npm --prefix apps/web run build
+      - name: Verify original Hyderabad demo on loopback
+        run: .venv/bin/python -X utf8 scripts/smoke_local_http.py
       - name: Verify local Edge flow
         working-directory: apps/web
         run: VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test --trace off
@@ -122,7 +134,7 @@ jobs:
           retention-days: 7
 
   hosted-edge:
-    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -135,6 +147,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: |
+            apps/hosted/package-lock.json
+            apps/web/package-lock.json
       - name: Install locked hosted dependencies
         run: |
           node --version
@@ -164,7 +180,7 @@ jobs:
           retention-days: 7
 
   acceptance:
-    if: always() && github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    if: always() && github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd'
     needs: [backend, hosted-unit, local-edge, hosted-edge]
     runs-on: ubuntu-24.04
     steps:

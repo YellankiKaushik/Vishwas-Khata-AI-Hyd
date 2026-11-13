@@ -10,35 +10,42 @@ fail() {
 }
 
 # Run before application code and npm lifecycle scripts on a disposable Actions VM.
-[[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted && $(uname -s) == Linux ]] || fail "requires a GitHub-hosted Linux runner"
-[[ $(dpkg --print-architecture) == amd64 ]] || fail "requires amd64"
+[[ ${GITHUB_ACTIONS:-} == true && ${RUNNER_ENVIRONMENT:-} == github-hosted &&
+   ${RUNNER_OS:-} == Linux && ${RUNNER_ARCH:-} == X64 && $(uname -s) == Linux ]] ||
+  fail "requires a GitHub-hosted Linux x64 runner"
+[[ $(id -u) != 0 && $(uname -m) == x86_64 && $(dpkg --print-architecture) == amd64 ]] ||
+  fail "requires a non-root user on amd64"
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || fail "requires Ubuntu 24.04"
 
-# Harden the known runner image layout before dpkg writes below /opt.
-stage='verify /opt before hardening on the disposable runner'
-[[ -d /opt && ! -L /opt && $(readlink -f -- /opt) == /opt ]] ||
-  fail 'expected /opt to be a real directory'
-root_metadata=$(stat -c '%u %a' -- /)
-read -r root_uid root_mode <<< "$root_metadata"
-[[ $root_uid == 0 ]] && (( (8#$root_mode & 0022) == 0 )) ||
-  fail 'expected / to be root-owned and not writable by group or other users'
-opt_metadata=$(stat -c '%u %g %a' -- /opt)
-read -r opt_uid opt_gid opt_mode <<< "$opt_metadata"
-printf 'Edge setup: /opt before hardening uid=%s gid=%s mode=%s\n' "$opt_uid" "$opt_gid" "$opt_mode"
-[[ $opt_uid == 0 ]] || fail 'expected /opt to be owned by root'
-if [[ $opt_mode == 777 ]]; then
-  stage='harden /opt on the disposable runner'
-  sudo chmod 0755 -- /opt
-fi
-stage='verify hardened /opt'
-[[ -d /opt && ! -L /opt && $(readlink -f -- /opt) == /opt ]] ||
-  fail 'expected /opt to remain a real directory'
-opt_metadata=$(stat -c '%u %a' -- /opt)
-read -r opt_uid opt_mode <<< "$opt_metadata"
-[[ $opt_uid == 0 ]] && (( (8#$opt_mode & 0022) == 0 )) ||
-  fail 'expected /opt to be root-owned and not writable by group or other users'
-printf 'Edge setup: /opt verified uid=%s mode=%s\n' "$opt_uid" "$opt_mode"
+edge_directories=(/opt /opt/microsoft /opt/microsoft/msedge)
+
+check_directory() {
+  local path=$1 phase=$2 metadata uid gid mode
+  stage="$phase directory $path"
+  [[ -d $path && ! -L $path && $(realpath -e -- "$path") == "$path" ]] ||
+    fail 'expected a real directory at the canonical path'
+  metadata=$(stat -c '%u %g %a' -- "$path")
+  read -r uid gid mode <<< "$metadata"
+  printf 'Edge setup: %s uid=%s gid=%s mode=%s\n' "$path" "$uid" "$gid" "$mode"
+  [[ $uid == 0 ]] || fail 'expected root ownership'
+  if (( (8#$mode & 0022) != 0 )); then
+    [[ $phase == prepare && $path != / ]] ||
+      fail 'group or other users can write to the package path'
+    stage="secure directory $path on the disposable runner"
+    sudo chmod 0755 -- "$path"
+    check_directory "$path" verify
+  fi
+}
+
+# Secure each parent before inspecting its children. dpkg creates any missing
+# package directories. A dangling symlink is present and must be rejected.
+check_directory / verify
+for path in "${edge_directories[@]}"; do
+  if [[ -e $path || -L $path ]]; then
+    check_directory "$path" prepare
+  fi
+done
 
 stage='create package workspace'
 work=$(mktemp -d)
@@ -80,6 +87,10 @@ stage='install verified Edge package with dpkg'
 sudo dpkg --install -- "$package"
 printf 'Edge setup: dpkg install completed\n'
 
+for path in / "${edge_directories[@]}"; do
+  check_directory "$path" verify
+done
+
 stage='verify installed version, architecture, and status with dpkg-query'
 installed=$(dpkg-query -W -f='${Version}|${Architecture}|${db:Status-Status}' "$package_name:$package_arch")
 [[ $installed == "$version|$package_arch|installed" ]] ||
@@ -101,13 +112,11 @@ for file in "$helper" "$browser"; do
   [[ $resolved == "$file" ]] || fail "installed path resolves outside its package location"
 done
 
-for path in / /opt /opt/microsoft /opt/microsoft/msedge "$helper" "$browser"; do
+for path in "$helper" "$browser"; do
   stage="verify root owner and write permissions with stat for $path"
   metadata=$(stat -c '%u %g %a' -- "$path")
   read -r uid gid mode <<< "$metadata"
   printf 'Edge setup: %s uid=%s gid=%s mode=%s\n' "$path" "$uid" "$gid" "$mode"
-  # The group can differ on runner-managed ancestor directories. With no group
-  # or other write bit, only root can modify the directory or its entries.
   [[ $uid == 0 ]] || fail "expected root ownership"
   (( (8#$mode & 0022) == 0 )) || fail "group or other users can write to the package path"
 done
@@ -124,3 +133,8 @@ stage='verify sandbox helper owner and mode with stat'
 [[ $(stat -c '%u:%g:%a' -- "$helper") == 0:0:4755 ]] || fail "expected root:root mode 4755"
 stage='read version using the verified Edge binary'
 "$browser" --version
+stage='launch sandboxed Edge with a fresh profile'
+timeout 45s "$browser" --headless --no-first-run --user-data-dir="$work/browser-profile" \
+  --dump-dom about:blank > "$work/browser-smoke.html"
+grep -Fq '<body>' "$work/browser-smoke.html" || fail 'headless Edge did not render the blank page'
+printf 'Edge setup: sandboxed startup and page render passed\n'

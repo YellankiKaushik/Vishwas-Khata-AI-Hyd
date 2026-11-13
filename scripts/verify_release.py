@@ -8,6 +8,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 FROZEN = '03d8192b989ae9d1da212f318ff172a919043830'
 TREE = 'ad842744a605517da3f4c63c9905ef781e312002'
+ATTRIBUTION = 'a5fb6b7217ae52a4a5d010100cf011f72670b237'
 SECRET = re.compile(rb'-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{25,}|sk-(?:proj-)?[A-Za-z0-9_-]{30,}|AKIA[A-Z0-9]{16}')
 
 
@@ -25,10 +26,20 @@ def main():
     with ZipFile(io.BytesIO(git('archive', '--format=zip', FROZEN))) as frozen:
         for name, digest in manifest['files'].items():
             assert hashlib.sha256(frozen.read(name)).hexdigest() == digest, name
-        assert json.loads((ROOT / 'SOURCE_MANIFEST.json').read_text()) == manifest
         migrations = [name for name in manifest['files'] if '/migrations/' in name or '/schema/' in name]
         for name in migrations:
             assert (ROOT / name).read_bytes() == frozen.read(name), 'Historical migration changed: ' + name
+    current_manifest = json.loads((ROOT / 'SOURCE_MANIFEST.json').read_text())
+    if current_manifest != manifest:
+        attributed_manifest = json.loads(git('show', ATTRIBUTION + ':SOURCE_MANIFEST.json'))
+        assert current_manifest == attributed_manifest, 'Unrecognized source manifest'
+        assert attributed_manifest['base_snapshot_commit'] == FROZEN
+        readme_hash = hashlib.sha256(git('show', ATTRIBUTION + ':README.md')).hexdigest()
+        expected = {
+            **manifest, 'base_snapshot_commit': FROZEN,
+            'files': {**manifest['files'], 'README.md': readme_hash},
+        }
+        assert attributed_manifest == expected, 'Attribution changed frozen source hashes'
     reference = ROOT / 'Project_Vishwas_Khata_V3'
     count = 0
     for line in (reference / 'SHA256_MANIFEST.txt').read_text().splitlines():
