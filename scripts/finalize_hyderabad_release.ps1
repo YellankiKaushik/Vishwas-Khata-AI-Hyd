@@ -291,13 +291,14 @@ try {
     Assert-Ancestor $candidate $mainSha
     Assert-Ancestor $venue $mainSha
     Assert-FinalRefs $mainSha $tagObject
+    Write-Host "Integration PR #$($pr.number) merged at $mainSha $($pr.url)"
+    Wait-Acceptance 'main' $mainSha
+
     $releases = @(Invoke-Gh api --paginate "repos/$repo/releases?per_page=100" --jq '.[].tag_name')
     if ($tag -cnotin $releases) {
         Invoke-Gh release create $tag --repo $repo --verify-tag --title 'Vishwas-Khata-AI Hyderabad venue release' --notes 'Frozen browser-tested Team Tic Tac Tech synthetic demo for the Hyderabad edition. Launch locally with scripts/demo_hyd.ps1. The SQLite ledger supports reviewed credit and repayment, a grounded deterministic assistant and unsent follow-up drafts.' | Out-Host
     }
     Invoke-Gh release view $tag --repo $repo --json tagName,url | Out-Host
-    Write-Host "Integration PR #$($pr.number) merged at $mainSha $($pr.url)"
-    Wait-Acceptance 'main' $mainSha
 
     $cleanup = [ordered]@{ $docs = $docsHead; $hosted = $candidate; $staging = $stagingSha; $integration = $integrationSha }
     foreach ($branch in $cleanup.Keys) {
