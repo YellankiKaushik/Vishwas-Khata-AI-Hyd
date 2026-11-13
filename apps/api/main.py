@@ -355,9 +355,10 @@ def create_app(settings: Settings | None = None, *, assistant_mock_provider=None
     if settings.hyd_enabled:
         from .assistant import assistant_router
         from .commitments import commitment_router
-        if assistant_live_provider is None and settings.hyd_live_approval and settings.hyd_assistant_key:
+        if (assistant_live_provider is None and settings.hyd_assistant_provider == 'openai'
+                and settings.hyd_live_approval and settings.hyd_assistant_key):
             from .hyd_provider import LiveAssistant
-            assistant_live_provider = LiveAssistant(settings.hyd_assistant_key, settings.hyd_live_approval)
+            assistant_live_provider = LiveAssistant(settings.hyd_assistant_key, settings.hyd_live_approval, model=settings.hyd_assistant_model)
         app.include_router(commitment_router(settings, merchant))
         app.include_router(assistant_router(settings, merchant, assistant_mock_provider, assistant_live_provider))
     generated_openapi = app.openapi

@@ -1,0 +1,13 @@
+{
+  "name": "vishwas-khata-hosted-db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "preflight": "node scripts/preflight.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mode": "SYNTHETIC_STAGING_FOUNDATIONS_ONLY",
+  "public_deployment_allowed": false,
+  "provider_calls_allowed": false,
+  "payments_allowed": false,
+  "outbound_messages_allowed": false,
+  "required_before_public_deployment": [
+    "Server-derived expiring demo sessions and cross-session HTTP tests",
+    "Reviewed financial draft and exact-version confirmation API parity",
+    "Bounded HTTP API, origin checks, distributed quotas and request-size limits",
+    "Frontend-to-hosted API compatibility and complete deployed Ramesh journey",
+    "Least-privilege managed PostgreSQL connection and migration witness",
+    "Real multi-connection PostgreSQL concurrency, backup and recovery tests",
+    "HTTPS browser acceptance and second independent browser witness"
+  ]
+}
