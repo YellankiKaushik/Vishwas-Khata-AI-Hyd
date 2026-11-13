@@ -95,6 +95,9 @@ stage='verify installed version, architecture, and status with dpkg-query'
 installed=$(dpkg-query -W -f='${Version}|${Architecture}|${db:Status-Status}' "$package_name:$package_arch")
 [[ $installed == "$version|$package_arch|installed" ]] ||
   fail "installed package does not match downloaded Edge $version ($package_arch)"
+stage='verify installed files with the package checksums'
+changed=$(dpkg --verify "$package_name:$package_arch")
+[[ -z $changed ]] || fail 'dpkg found changed or missing package files'
 
 helper=/opt/microsoft/msedge/msedge-sandbox
 browser=/opt/microsoft/msedge/msedge
