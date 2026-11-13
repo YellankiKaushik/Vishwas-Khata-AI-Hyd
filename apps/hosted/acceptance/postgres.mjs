@@ -31,6 +31,12 @@ test('managed PostgreSQL private role, independent connections, concurrent repla
       FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner
       WHERE n.nspname='hyd_demo' AND NOT r.rolsuper AND NOT r.rolbypassrls AND r.rolname <> current_user`));
     assert.ok(owner, 'A separate non-superuser owns the schema');
+    const rowSecurity = await transact(db => query(db, `SELECT count(*)::int AS value
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='hyd_demo' AND c.relrowsecurity AND c.relforcerowsecurity
+        AND c.relname IN ('customers','journal','commitments','commitment_events',
+          'commitment_receipts','financial_drafts','confirmation_receipts')`));
+    assert.equal(rowSecurity, 7);
     const customer = await transact(async db => {
       assert.equal(await bind(db, a), tenantA);
       assert.equal(await query(db, 'SELECT current_user AS value'), 'hyd_runtime');
@@ -93,6 +99,10 @@ test('managed PostgreSQL private role, independent connections, concurrent repla
       await bind(db, b);
       await confirm(db, randomUUID());
     }), /DRAFT_NOT_FOUND/);
+    await assert.rejects(transact(async db => {
+      await bind(db, a);
+      return review(db, 2, true);
+    }), /IDEMPOTENCY_CONFLICT/);
     const commitment = randomUUID();
     const ledger = db => query(db, 'SELECT hyd_demo.ledger_evidence($1) AS value', [customer]);
     const createCommitment = db => query(db, `SELECT hyd_demo.reviewed_commitment_change(
@@ -163,6 +173,21 @@ test('managed PostgreSQL private role, independent connections, concurrent repla
         $1,$2,$3,'CANCEL',2,NULL,NULL,$4,'Wrong customer') AS value`,
         [wrongCustomer, commitment, randomUUID(), evidence.ledger_hash]);
     }), /COMMITMENT_NOT_FOUND/);
+    const reversal = await transact(async db => {
+      await bind(db, a);
+      const extra = await query(db, `SELECT hyd_demo.save_financial_draft(
+        NULL,$1,NULL,$2,'CREDIT_GIVEN',10000,NULL) AS value`, [randomUUID(), customer]);
+      const posted = await query(db, 'SELECT hyd_demo.confirm_financial_draft($1,$2,1,true) AS value',
+        [extra.draft_id, randomUUID()]);
+      const correction = await query(db, `SELECT hyd_demo.save_financial_draft(
+        NULL,$1,NULL,$2,'REVERSAL',NULL,$3,'Synthetic compensating reversal') AS value`,
+        [randomUUID(), customer, posted.entry_id]);
+      return query(db, 'SELECT hyd_demo.confirm_financial_draft($1,$2,1,true) AS value',
+        [correction.draft_id, randomUUID()]);
+    });
+    assert.equal(reversal.signed_paise, -10000);
+    assert.equal(reversal.balance_after_paise, 30000);
+
     await transact(db => query(db, 'SELECT hyd_demo.revoke_demo_session($1) AS value', [b]));
     assert.equal(await transact(db => bind(db, b)), null);
 

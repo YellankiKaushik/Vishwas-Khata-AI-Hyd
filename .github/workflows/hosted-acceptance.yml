@@ -1,0 +1,94 @@
+name: Hosted synthetic acceptance
+on:
+  push:
+    branches: [feat/hosted-synthetic-parity]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && github.ref == 'refs/heads/feat/hosted-synthetic-parity'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+      - name: Install locked Python dependencies
+        id: python
+        run: |
+          mkdir -p .tmp
+          python -m venv .venv
+          .venv/bin/python -m pip install pip==26.3
+          .venv/bin/python -m pip install -r requirements-lock.txt
+          .venv/bin/python --version
+          .venv/bin/python -m pip --version
+          .venv/bin/python -m pip show fastapi pytest pip_audit
+      - name: Install locked hosted dependencies
+        id: hosted
+        if: "!cancelled()"
+        run: |
+          node --version
+          npm --version
+          npm --prefix apps/hosted ci
+          node -e "const p=require('./apps/hosted/node_modules/@electric-sql/pglite/package.json').version; console.log(p); if (p !== '0.5.16') process.exit(1)"
+          npm --prefix apps/hosted ls --depth=0
+      - name: Install locked frontend dependencies
+        id: web
+        if: "!cancelled()"
+        run: |
+          npm --prefix apps/web ci
+          npm --prefix apps/web ls --depth=0
+      - name: Verify backend and reference contracts
+        if: "!cancelled() && steps.python.outcome == 'success'"
+        run: |
+          .venv/bin/python -X utf8 -m pytest -q tests
+          .venv/bin/python -X utf8 -m pytest -q Project_Vishwas_Khata_V3/tests
+          .venv/bin/python -X utf8 Project_Vishwas_Khata_V3/verification/verify_v3.py
+          git restore -- Project_Vishwas_Khata_V3/verification/V3_STATIC_AUDIT_RESULTS.txt
+          .venv/bin/python -X utf8 scripts/verify_release.py
+      - name: Verify hosted unit tests
+        if: "!cancelled() && steps.hosted.outcome == 'success'"
+        run: npm --prefix apps/hosted test
+      - name: Verify frontend unit tests
+        if: "!cancelled() && steps.web.outcome == 'success'"
+        run: npm --prefix apps/web test
+      - name: Build production frontend
+        id: build
+        if: "!cancelled() && steps.web.outcome == 'success'"
+        run: npm --prefix apps/web run build
+      - name: Verify local Edge flow
+        if: "!cancelled() && steps.python.outcome == 'success' && steps.build.outcome == 'success'"
+        working-directory: apps/web
+        run: |
+          microsoft-edge --version
+          VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test
+      - name: Verify real PostgreSQL and hosted HTTPS Edge flow
+        if: "!cancelled() && steps.hosted.outcome == 'success' && steps.build.outcome == 'success'"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+          docker info --format '{{.OSType}} {{.ServerVersion}}'
+          pwsh -NoProfile -File scripts/test_hosted_postgres.ps1 -Browser -CiBrowser
+      - name: Audit Python lock
+        if: "!cancelled() && steps.python.outcome == 'success'"
+        run: |
+          .venv/bin/python -m pip check
+          .venv/bin/python -m pip_audit -r requirements-lock.txt
+      - name: Audit hosted npm lock
+        if: "!cancelled() && steps.hosted.outcome == 'success'"
+        run: npm --prefix apps/hosted audit
+      - name: Audit frontend npm lock
+        if: "!cancelled() && steps.web.outcome == 'success'"
+        run: npm --prefix apps/web audit

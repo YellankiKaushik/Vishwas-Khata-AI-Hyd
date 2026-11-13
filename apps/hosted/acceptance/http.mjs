@@ -46,15 +46,52 @@ const [first, second] = sessions.map(session => session.cookie.split(';')[0]);
 const customers = (await call('/v1/customers', { cookie: first })).data;
 const cid = customers.find(row => row.display_name === 'Ramesh').id;
 await call('/v1/customers/' + cid + '/balance', { cookie: second, status: 404 });
-const draft = (await call('/v1/ledger/drafts', { method: 'POST', cookie: first,
-  headers: { 'client-operation-id': randomUUID() }, payload: { transcript: '', language: 'en-IN',
-    parsed_override: { customer_id: cid, entry_type: 'CREDIT_GIVEN', amount_paise: 50000, currency: 'INR' } } })).data;
+const makeDraft = async (entryType, amount) => (await call('/v1/ledger/drafts', {
+  method: 'POST', cookie: first, headers: { 'client-operation-id': randomUUID() },
+  payload: { transcript: '', language: 'en-IN',
+    parsed_override: { customer_id: cid, entry_type: entryType, amount_paise: amount, currency: 'INR' } },
+})).data;
+const confirm = (draft, key, status = 200) => call('/v1/ledger/drafts/' + draft.draft_id + '/confirm', {
+  method: 'POST', cookie: first, status, headers: { 'idempotency-key': key },
+  payload: { confirm: true, expected_version: draft.version },
+});
+const credit = await makeDraft('CREDIT_GIVEN', 50000);
 const key = randomUUID();
-const confirm = () => call('/v1/ledger/drafts/' + draft.draft_id + '/confirm', { method: 'POST', cookie: first,
-  headers: { 'idempotency-key': key }, payload: { confirm: true, expected_version: draft.version } });
-const [a,b] = await Promise.all([confirm(), confirm()]);
+const [a,b] = await Promise.all([confirm(credit, key), confirm(credit, key)]);
 assert.deepEqual(a.data,b.data);
 assert.equal(a.data.outstanding_balance_paise,50000);
+const repayment = await makeDraft('REPAYMENT_RECEIVED', 20000);
+assert.equal((await confirm(repayment, key, 409)).data.error.code, 'IDEMPOTENCY_CONFLICT');
+assert.equal((await confirm(repayment, randomUUID())).data.outstanding_balance_paise, 30000);
+assert.deepEqual((await confirm(credit, key)).data, a.data);
+
+const balancePath = '/v1/customers/' + cid + '/balance?include_review_token=true';
+const duePath = '/v1/followups/due';
+const balance = (await call(balancePath, { cookie: first })).data;
+const due = (await call(duePath, { cookie: first })).data;
+const commitment = (await call('/v1/commitments', {
+  method: 'POST', cookie: first, headers: { 'client-operation-id': randomUUID() },
+  payload: { customer_id: cid, expected_date: due.as_of_date_ist, promised_amount_paise: 30000,
+    reviewed_ledger_hash: balance.ledger_hash, reason: 'Synthetic HTTPS acceptance' },
+})).data;
+const answer = (await call('/v1/assistant/questions', {
+  method: 'POST', cookie: first, payload: { question: 'How much does Ramesh owe?',
+    customer_id: cid, language: 'en-IN', request_id: randomUUID() },
+})).data;
+assert.equal(answer.items[0].outstanding_paise, 30000);
+const draftOptions = { method: 'POST', cookie: first,
+  payload: { commitment_id: commitment.id, expected_version: commitment.version,
+    language: 'en-IN', tone: 'POLITE', facts_hash: commitment.evidence_hash, confirm_review: true } };
+const draft = (await call('/v1/followups/drafts', draftOptions)).data;
+assert.equal(draft.status, 'DRAFT_NOT_SENT');
+assert.equal(draft.sent, false);
+const laterRepayment = await makeDraft('REPAYMENT_RECEIVED', 10000);
+assert.equal((await confirm(laterRepayment, randomUUID())).data.outstanding_balance_paise, 20000);
+assert.equal((await call('/v1/followups/drafts', { ...draftOptions, status: 409 })).data.error.code, 'STALE_EVIDENCE');
+const laterCredit = await makeDraft('CREDIT_GIVEN', 50000);
+assert.equal((await confirm(laterCredit, randomUUID())).data.outstanding_balance_paise, 70000);
+assert.equal((await call('/v1/commitments/' + commitment.id, { cookie: first })).data.due_status, 'REVIEW_REQUIRED');
+assert.equal((await call('/v1/ledger/entries', { cookie: first })).data.items.length, 4);
 assert.deepEqual((await call('/v1/ledger/entries', { cookie: second })).data.items, []);
 const assistantPath = '/v1/assistant/questions';
 await Promise.all(Array.from({ length: 20 }, () =>
@@ -89,4 +126,4 @@ if (process.argv.includes('--expire-disposable-session')) {
   await call('/v1/demo/session', { method: 'DELETE', cookie: second });
   await call('/v1/merchants/me', { cookie: second, status: 401 });
 }
-console.log('HTTPS assets, readiness, origin, input bounds, isolation, concurrent receipt replay, request limits and revocation passed.');
+console.log('HTTPS assets, readiness, origin, input bounds, isolation, concurrent receipt replay, financial journey, stale evidence, request limits and revocation passed.');

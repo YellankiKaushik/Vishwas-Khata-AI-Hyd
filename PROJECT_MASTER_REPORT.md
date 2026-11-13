@@ -2,6 +2,44 @@
 
 Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
+## Latest release decision
+
+**Public demo status: NOT_DEPLOYED.** The frozen SQLite venue release is preserved. Hosted PR #2 remains an open draft against feat/synthetic-staging-foundations. Do not promote it until locked regressions, real PostgreSQL and hosted browser acceptance pass. The hosted public preflight still exits 1.
+
+| GitHub ref or local checkpoint | Verified SHA and state |
+| --- | --- |
+| main and merged [PR #1](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/1) | 482e80a98a770b6e09786d52d754c4686efc6c37. GitHub attributes the merge to YellankiKaushik. PR head a5fb6b7217ae52a4a5d010100cf011f72670b237. The original release root remains in history. Contributors graph refresh was not checked. |
+| Published [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) | 50a3623651267df240ecf1d29204a0a967e892c7, tree 0682cc672307f8fcb20054cd57195dfe44a83de4 locally. GitHub confirms this head is still an open draft. |
+| Local hosted acceptance parent | 3e2d40972883b616d9b8f94f303affb3a224c052, directly descended from the published head. The new acceptance commit is its child. |
+
+### Windows diagnosis and safe fallback
+
+The shell is Codex-managed Windows build 26300 with PowerShell 7.6.9. Node 24.16.0, npm 11.9.0, Python 3.11.9 and system pip 25.3 were observed. The checkout's Python 3.12 venv has bootstrap pip 25.0.1. Docker CLI 29.9.2 and the Desktop launcher exist. A normal user-level startup launched the process but produced no engine. Both the default and desktop-linux named pipes were absent. The Desktop log reports that the launcher cannot read the Docker Desktop registry key from this session. WSL status and distribution listing returned Wsl/E_ACCESSDENIED. Service Control Manager and virtualization CIM queries also returned access errors. These observations describe this process boundary. No conclusion about laptop-wide Docker or virtualization health was established.
+
+No accessible PostgreSQL binaries, server process, or approved PostgreSQL connection were found. WSL could not be inspected for a working instance. npm registry DNS failed, PyPI could not supply pinned pip, and shell Git could not resolve GitHub. The GitHub connector confirmed public branch and PR metadata.
+
+The new branch-only GitHub Actions workflow uses a standard Ubuntu 24.04 runner and a loopback-only disposable PostgreSQL 17 container. It installs both npm locks and the Python lock, runs independent unit and build steps, verifies both Edge suites, uses a disposable CA trusted in the runner's NSS store, and runs dependency audits. PostgreSQL tests assert FORCE RLS, migration checksums, competing edits, conflicting retries and compensating reversal. The HTTPS smoke adds the full 50,000 → 30,000 → 20,000 → 70,000 paise journey, original receipt replay and stale follow-up rejection. The browser test now gives both manually created contexts a base URL for relative HTTP requests. The workflow uses no cloud database, repository write permissions, or deployment credentials.
+
+### Current acceptance evidence
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| scripts/verify_hosted_windows.ps1 -HostedBrowser | 1 | Stopped at scripts/setup.ps1 -DependenciesOnly. Pinned pip 26.3 unavailable through this network. |
+| Python 3.11.9 -X utf8 -m pytest -q tests/test_provider_staging.py Project_Vishwas_Khata_V3/tests | 0 | 48 passed, comprising 10 provider guard and 38 V3 reference tests. |
+| Python 3.11.9 -X utf8 Project_Vishwas_Khata_V3/verification/verify_v3.py | 0 | Static and SQLite reference verifier passed. Generated verification report was restored to the tracked historical file. |
+| node --test apps/hosted/tests/*.test.mjs | 0 | 18 supplemental passes with cached PGlite 0.5.12. Hosted lock remains PGlite 0.5.16 and pg 8.23.1. |
+| scripts/test_hosted_postgres.ps1 | 1 | Stopped at docker info. No database provisioned and no real PostgreSQL or browser witness. |
+| node --check and PowerShell parser | 0 | Changed acceptance scripts parse. Three Playwright TypeScript files parsed with cached TypeScript 5.9.3. Workflow YAML parsed. Managed MSYS Bash could not start for an additional syntax check. |
+| node apps/hosted/scripts/preflight.mjs | 1 | Public environment and witnessed acceptance remain unavailable. |
+
+Full backend, frontend, locked hosted, Edge, and advisory checks are still blocked. The retained pins include FastAPI 0.162.0, pytest 9.2.0, pip_audit 2.10.1, Playwright 1.64.1, Vitest 5.0.5, TypeScript 5.8.3 and Vite 8.3.5. No locks changed. The six unresolved V3 cases remain EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079.
+
+From the approved checkout in an authenticated ordinary terminal, run **git -C .tmp/development push origin HEAD:refs/heads/feat/hosted-synthetic-parity**. This should update draft PR #2 and trigger the workflow without changing laptop Docker or WSL. Verify the resulting Actions run and retain its exact test evidence. Public deployment subsequently needs access to one approved free Node-capable HTTPS runtime and one dedicated synthetic PostgreSQL project with private runtime and separate migration credentials. No public URL exists.
+
+## Historical publication and verification
+
+The sections below preserve earlier observations. Use the latest release decision above for current status.
+
 ## Published branches and current verification
 
 GitHub confirmed both branches and both pull requests. The original main commit and venue release are intact. The hosted PR remains a draft against staging.

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 test("two isolated browsers complete the hosted ledger and review workflow", async ({ browser, baseURL }) => {
-  const desktop = await browser.newContext();
-  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const desktop = await browser.newContext({ baseURL });
+  const mobile = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 } });
   try {
     const page = await desktop.newPage();
     const other = await mobile.newPage();

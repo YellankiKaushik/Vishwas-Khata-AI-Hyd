@@ -7,5 +7,11 @@ if (!baseURL || new URL(baseURL).protocol !== "https:") {
 export default defineConfig({
   testDir: "e2e-hosted",
   workers: 1,
-  use: { baseURL, browserName: "chromium", channel: "msedge", trace: "retain-on-failure" },
+  use: {
+    baseURL,
+    browserName: "chromium",
+    channel: "msedge",
+    launchOptions: { chromiumSandbox: true },
+    trace: "retain-on-failure",
+  },
 });
