@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
+import { createServer as createSecureServer } from 'node:https';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { createHandler } from './handler.mjs';
@@ -23,7 +24,15 @@ const security = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
-const server = createServer(async (req, res) => {
+const certificateFile = process.env.HOSTED_LOCAL_TLS_CERT_FILE;
+const keyFile = process.env.HOSTED_LOCAL_TLS_KEY_FILE;
+const bindAddress = process.env.HOSTED_BIND_ADDRESS || '127.0.0.1';
+const localTLS = Boolean(certificateFile || keyFile);
+if (localTLS && (!certificateFile || !keyFile || bindAddress !== '127.0.0.1' ||
+    !['127.0.0.1', 'localhost'].includes(new URL(origin).hostname))) {
+  throw new Error('INVALID_LOCAL_TLS_CONFIGURATION');
+}
+async function serve(req, res) {
   try {
     // Run behind an HTTPS terminator that preserves Host and can reach the private listener.
     if (req.headers.host !== expectedHost || !req.url?.startsWith('/') ||
@@ -40,10 +49,14 @@ const server = createServer(async (req, res) => {
       // The peer address is the only trusted address until the ingress is configured to
       // replace forwarded headers. Global creation quotas still apply behind a proxy.
       const response = await handle(input, { clientAddress: req.socket.remoteAddress });
+      // Finish the structured response before closing an unread upload.
+      if (!req.readableEnded) {
+        res.setHeader('Connection', 'close');
+        res.shouldKeepAlive = false;
+      }
       res.writeHead(response.status, { ...security, ...Object.fromEntries(response.headers) });
-      if (response.body) Readable.fromWeb(response.body).pipe(res);
+      if (response.body) Readable.fromWeb(response.body).on('error', () => res.destroy()).pipe(res);
       else res.end();
-      if (!req.complete) req.resume();
       return;
     }
     if (!['GET','HEAD'].includes(req.method)) {
@@ -65,7 +78,10 @@ const server = createServer(async (req, res) => {
     else res.writeHead(503, security).end();
     console.error(JSON.stringify({ event: 'hosted_transport_failure' }));
   }
-});
+}
+const server = localTLS
+  ? createSecureServer({ cert: await readFile(certificateFile), key: await readFile(keyFile), minVersion: 'TLSv1.2' }, serve)
+  : createServer(serve);
 server.requestTimeout = 15000;
 server.headersTimeout = 10000;
-server.listen(Number(process.env.PORT || 8080), process.env.HOSTED_BIND_ADDRESS || '127.0.0.1');
+server.listen(Number(process.env.PORT || 8080), bindAddress);

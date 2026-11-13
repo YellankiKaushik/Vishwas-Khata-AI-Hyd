@@ -177,3 +177,18 @@ test('session creation bounds include malformed requests', async () => {
   const response = await call('/demo/session', { method: 'POST', clientAddress, expect: 429 });
   assert.equal(response.data.error.code, 'RATE_LIMITED');
 });
+
+test('readiness and declared upload limits fail with structured responses', async () => {
+  const unavailable = createHandler({
+    origin, secret: 'unit-test-secret-for-hosted-tests-only',
+    transact: async action => action({ query: async () => ({ rows: [{ value: false }] }) }),
+  });
+  const readiness = await unavailable(new Request(origin + '/v1/health/ready'));
+  assert.equal(readiness.status, 503);
+  assert.equal((await readiness.json()).error.code, 'NOT_READY');
+  const size = await call('/demo/session', {
+    method: 'POST', input: {}, clientAddress: '192.0.2.101',
+    headers: { 'content-length': '8193' }, expect: 413,
+  });
+  assert.equal(size.data.error.code, 'BODY_TOO_LARGE');
+});

@@ -10,7 +10,8 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     const blocked: string[] = [];
     for (const tab of [page, other]) {
       tab.on("request", request => {
-        if (new URL(request.url()).origin !== new URL(baseURL!).origin) blocked.push(request.url());
+        if (["http:", "https:"].includes(new URL(request.url()).protocol) &&
+            new URL(request.url()).origin !== new URL(baseURL!).origin) blocked.push(request.url());
       });
       await tab.goto(baseURL!);
       await expect(tab.getByText("Hosted demo", { exact: false }).first()).toBeVisible();
@@ -57,19 +58,36 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
       return receipts[0].outstanding_balance_paise;
     };
     expect(await financial(20000, "REPAYMENT_RECEIVED")).toBe(30000);
-    const balance = await get("/customers/" + customer.id + "/balance?include_review_token=true");
+    await page.reload();
+    await page.getByRole("button", { name: "Merchant Assistant" }).click();
+    await page.getByLabel("Commitment customer").selectOption(customer.id);
+    await page.getByRole("button", { name: "Review new commitment" }).click();
+    await expect(page.getByRole("heading", { name: "Record expected date" })).toBeVisible();
     const date = (await get("/followups/due")).as_of_date_ist;
-    const commitment = await write("/commitments", { customer_id: customer.id, expected_date: date,
-      promised_amount_paise: 30000, reviewed_ledger_hash: balance.ledger_hash, reason: "Synthetic review" }, randomUUID());
-    expect((await get("/followups/due")).items[0].id).toBe(commitment.id);
-    const answer = await write("/assistant/questions", { question: "How much does Ramesh owe?",
-      customer_id: customer.id, language: "en-IN", request_id: randomUUID() });
-    expect(answer.items[0].outstanding_paise).toBe(30000);
-    const followup = { commitment_id: commitment.id, expected_version: commitment.version,
-      language: "en-IN", tone: "POLITE", facts_hash: commitment.evidence_hash, confirm_review: true };
-    expect(await write("/followups/drafts", followup)).toMatchObject({ status: "DRAFT_NOT_SENT", sent: false });
+    await page.getByLabel("Expected date (IST)").fill(date);
+    await page.getByLabel(/Promised amount/).fill("300");
+    await page.getByLabel("Reason", { exact: true }).fill("Synthetic review");
+    await page.getByLabel("I reviewed this balance and expected date.").check();
+    await page.getByRole("button", { name: /save commitment/i }).click();
+    const due = page.getByRole("button", { name: "Review follow-up draft" });
+    await expect(due).toBeVisible();
+    const commitment = (await get("/followups/due")).items[0];
+    expect((await get("/commitments/" + commitment.id + "/events")).items[0]).toMatchObject({
+      event_type: "CREATED", reason: "Synthetic review",
+    });
+    await page.getByLabel("Question customer (optional)").selectOption(customer.id);
+    await page.getByLabel("Question", { exact: true }).fill("How much does Ramesh owe?");
+    await page.getByRole("button", { name: "Ask assistant" }).click();
+    await expect(page.getByText(/Ramesh's recorded outstanding balance is/)).toBeVisible();
+    await due.click();
+    await page.getByRole("button", { name: "Confirm review and prepare draft" }).click();
+    await expect(page.getByText("Draft not sent", { exact: true })).toBeVisible();
     expect(await financial(10000, "REPAYMENT_RECEIVED")).toBe(20000);
-    expect((await write("/followups/drafts", followup, undefined, false, 409)).error.code).toBe("STALE_EVIDENCE");
+    const staleResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === "/v1/followups/drafts" && response.status() === 409);
+    await page.getByRole("button", { name: "Check freshness and copy" }).click();
+    expect((await (await staleResponse).json()).error.code).toBe("STALE_EVIDENCE");
+    await expect(page.getByText("Draft not sent", { exact: true })).toHaveCount(0);
     expect(await financial(50000, "CREDIT_GIVEN")).toBe(70000);
     expect((await get("/commitments/" + commitment.id)).due_status).toBe("REVIEW_REQUIRED");
     expect((await (await mobile.request.get("/v1/ledger/entries")).json()).items).toEqual([]);

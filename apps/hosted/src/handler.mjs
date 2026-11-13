@@ -61,15 +61,21 @@ async function body(request, optional = false) {
   if (request.headers.get('content-type')?.split(';')[0] !== 'application/json' || !request.body) {
     throw new RequestError(415, 'JSON_REQUIRED', 'Send a JSON request.');
   }
+  const declaredLength = request.headers.get('content-length');
+  if (declaredLength !== null && Number(declaredLength) > BODY_LIMIT)
+    throw new RequestError(413, 'BODY_TOO_LARGE', 'Request body is too large.');
   const reader = request.body.getReader();
   const chunks = [];
   let length = 0;
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      reader.releaseLock();
+      break;
+    }
     length += value.byteLength;
     if (length > BODY_LIMIT) {
-      void reader.cancel().catch(() => {});
+      reader.releaseLock();
       throw new RequestError(413, 'BODY_TOO_LARGE', 'Request body is too large.');
     }
     chunks.push(value);
@@ -343,7 +349,8 @@ export function createHandler({ transact, origin, secret, log = () => {} }) {
         throw new RequestError(403, 'ORIGIN_DENIED', 'Use the configured demo origin.');
       if (method === 'GET' && path === '/health/live') return response({ status: 'alive' });
       if (method === 'GET' && path === '/health/ready') {
-        await transact(db => scalar(db, 'SELECT hyd_demo.hosted_ready() AS value'));
+        if (await transact(db => scalar(db, 'SELECT hyd_demo.hosted_ready() AS value')) !== true)
+          throw new RequestError(503, 'NOT_READY', 'The hosted database is not ready.');
         return response({ status: 'ready', schema_revision: '004', hyd_enabled: true, hosted: true,
           voice_provider: 'disabled', voice_live_verified: false, stt_verified_languages: [],
           tts_verified_languages: [], tts_live_verified: false, synthetic_clock: null });

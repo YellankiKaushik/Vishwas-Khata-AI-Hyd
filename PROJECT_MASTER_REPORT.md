@@ -2,6 +2,62 @@
 
 Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
+## Recovery and acceptance pass
+
+The approved Hyderabad checkout is clean on main. Its separate .tmp/development repository contains all four prior commits with their original object IDs and parents. The verified complete-history bundle is .tmp/hyderabad-recovered.bundle, SHA-256 F71FCEF27F944E383CDAA6D340EB2A03F6BAEEE40129129B3DD28EC8613FE945. The follow-up fixes are on feat/hosted-synthetic-parity, which still descends from the staging tip. The root release and earlier backups were preserved.
+
+GitHub still reports main at 03d8192b989ae9d1da212f318ff172a919043830 and staging at 206e6cd02205987dadda1685134d2f2e14f46821. The main-based maintainer commit 1deae905623b828a82c3916cc7061c3908b44b21 changes README.md and SOURCE_MANIFEST.json only. Each tree's 167 manifest entries matched its archive. The documentation author and committer match the identity that GitHub recognized on staging. Direct Git and the managed Windows PowerShell network probe could not resolve GitHub. The connected GitHub account's branch write returned 403. No PR, new remote author attribution, Contributors refresh, or public deployment has been observed.
+
+| Command or witness | Result this pass |
+| --- | --- |
+| Windows PowerShell Test-NetConnection github.com -Port 443, git ls-remote, npm ping | Managed shell DNS/network failure. The user's separate normal PowerShell clone was reported successful. |
+| scripts/setup.ps1 -DependenciesOnly | Exit 1. Python 3.12.14 created a venv with bootstrap pip 25.0.1. The pip 26.3 download failed. |
+| npm ci for apps/hosted and apps/web | Exit 1. Registry unavailable. Node 24.16.0 and npm 11.9.0. Locked PGlite 0.5.16 was unavailable. |
+| node --test apps/hosted/tests/*.test.mjs | Exit 0, 18 passed using cached PGlite 0.5.12. Includes two fake Paytm tests. The lockfile is unchanged. |
+| Python 3.11.9 -X utf8 -m pytest -q tests/test_provider_staging.py Project_Vishwas_Khata_V3/tests | Exit 0, 10 injected-provider and 38 reference tests passed. |
+| Python 3.11.9 -X utf8 -m pytest -q tests | Exit 2, 15 collection errors because FastAPI is unavailable. |
+| npm run test and npm run test:e2e in apps/web | Exit 1. Vitest and tsc unavailable after the failed install. A TypeScript 5.9.3 source parse of the modified hosted browser test passed. |
+| npm audit and python -m pip_audit -r requirements-lock.txt | Unavailable. The npm audit DNS lookup failed and pip_audit could not be installed. |
+| scripts/test_hosted_postgres.ps1 | Exit 1 at docker info. The Docker Desktop Linux engine pipe is unavailable. No database was provisioned. |
+| node apps/hosted/scripts/preflight.mjs | Exit 1. Private environment and public acceptance evidence are outstanding. |
+
+Hosted readiness now checks the database result. Oversized uploads retain a structured 413 response, and the local acceptance service supports TLS on the loopback listener. The PostgreSQL script prepares a disposable TLS database, applies migrations twice, checks real roles and independent connections, and verifies signed journal totals after restoring a backup. The HTTPS smoke exercises the actual Node transport, and the Edge test now drives the React commitment, assistant and stale draft flows. These prepared acceptance paths still require a real run.
+
+Run from the approved checkout in ordinary PowerShell:
+
+```powershell
+git fetch .tmp/hyderabad-recovered.bundle refs/heads/docs/hyderabad-maintainer:refs/heads/docs/hyderabad-maintainer refs/heads/feat/hosted-synthetic-parity:refs/heads/recovered/hosted-synthetic-parity
+gh auth status
+gh api user --jq .login
+git ls-remote origin refs/heads/main refs/heads/feat/synthetic-staging-foundations
+git -C .tmp/development push origin docs/hyderabad-maintainer
+gh pr create --repo YellankiKaushik/Vishwas-Khata-AI-Hyd --base main --head docs/hyderabad-maintainer --title "Document Hyderabad maintainership and project lineage" --body "README and manifest only. All 167 snapshot hashes verified."
+```
+
+Check that the PR changes only the README and manifest, that required checks pass, and that GitHub recognizes the author before merging with a normal merge commit. Verify ancestry in the merged main history.
+
+Run the locked suite in the separate development checkout, with Docker Desktop running for PostgreSQL:
+
+```powershell
+Set-Location .tmp/development
+./scripts/setup.ps1 -DependenciesOnly
+node -p "require('./apps/hosted/node_modules/@electric-sql/pglite/package.json').version"
+./.venv/Scripts/python.exe -X utf8 -m pytest -q tests Project_Vishwas_Khata_V3/tests
+./.venv/Scripts/python.exe -X utf8 scripts/verify_release.py
+npm.cmd --prefix apps/hosted test
+npm.cmd --prefix apps/web test
+npm.cmd --prefix apps/web run build
+npm.cmd --prefix apps/web run test:e2e
+npm.cmd --prefix apps/hosted audit
+npm.cmd --prefix apps/web audit
+./.venv/Scripts/python.exe -m pip_audit -r requirements-lock.txt
+./scripts/test_hosted_postgres.ps1 -Browser
+```
+
+Require the package version check to print 0.5.16 and each required check to exit 0. The disposable PostgreSQL script prints the certificate path and keeps the loopback service running for the Edge test. From apps/web in a test profile that trusts the generated local certificate, set VISHWAS_HOSTED_TEST_URL to the printed URL and run npm.cmd exec -- playwright test -c playwright.hosted.config.ts. Once verified, push feat/hosted-synthetic-parity and open its PR against feat/synthetic-staging-foundations.
+
+Render documents a free Docker-capable web service but its free PostgreSQL databases expire after 30 days. A separate free Neon project is a candidate for durable synthetic persistence, subject to verifying role and connection support with an approved account. Existing Vercel configuration still enforces the gate and no authorized runtime or database was detected. Keep migration and runtime credentials separate, complete private acceptance, and promote only after the required HTTPS and recovery evidence is recorded. [Render free plan](https://render.com/docs/free) · [Render web services](https://render.com/docs/web-services) · [Neon free plan](https://neon.com/blog/neon-free-plan-1-gb-per-project)
+
 ## 1. Executive status
 
 | Decision | Status | Evidence |
