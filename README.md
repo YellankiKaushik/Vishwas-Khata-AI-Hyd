@@ -6,7 +6,7 @@ Repository maintainer: [@YellankiKaushik](https://github.com/YellankiKaushik)
 
 Hackathon team: Tic Tac Tech
 
-Vishwas-Khata-AI Hyderabad builds on the earlier Vishwas-Khata codebase for the Paytm Build for India AI Hackathon, Hyderabad Edition, Track 1 (Merchant Growth AI).
+Vishwas-Khata-AI Hyderabad is Team Tic Tac Tech's project for the Hyderabad Edition of the Paytm Build for India AI Hackathon, Track 1 (Merchant Growth AI). It builds on the earlier Vishwas-Khata codebase developed for the Bengaluru edition.
 
 ## Launch the Hyderabad demo
 
