@@ -353,12 +353,12 @@ export function createHandler({ transact, origin, secret, log = () => {} }) {
       const token = cookie.length === 1 ? cookie[0].slice(COOKIE.length + 1) : '';
       const tokenHash = /^[A-Za-z0-9_-]{43}$/.test(token) ? hash('session:' + token) : null;
       if (method === 'POST' && path === '/demo/session') {
-        exact(await body(request, true), []);
         const allowed = await transact(async db => {
           if (!await quota(db, 'open:' + clientAddress, 8)) return false;
           return quota(db, 'open:global', 60);
         });
         if (!allowed) throw new RequestError(429, 'RATE_LIMITED', 'Wait a minute before retrying.');
+        exact(await body(request, true), []);
         const next = randomBytes(32).toString('base64url');
         const result = await transact(async db => {
           if (tokenHash) await scalar(db, 'SELECT hyd_demo.revoke_demo_session($1) AS value', [tokenHash]);

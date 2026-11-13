@@ -25,12 +25,12 @@ before(async () => {
 });
 after(() => pg.close());
 
-async function call(path, { method = 'GET', input, cookie, headers = {}, expect = 200 } = {}) {
+async function call(path, { method = 'GET', input, cookie, headers = {}, expect = 200, clientAddress = '127.0.0.1' } = {}) {
   const response = await handler(new Request(origin + '/v1' + path, {
     method, headers: { origin, ...(cookie ? { cookie } : {}),
       ...(input !== undefined ? { 'content-type': 'application/json' } : {}), ...headers },
     ...(input !== undefined ? { body: JSON.stringify(input) } : {}),
-  }), { clientAddress: '127.0.0.1' });
+  }), { clientAddress });
   const data = await response.json();
   assert.equal(response.status, expect, JSON.stringify(data));
   return { data, setCookie: response.headers.get('set-cookie') };
@@ -63,6 +63,12 @@ test('reviewed hosted financial journey, tenant denial and original receipts', a
     cookie, method: 'POST', headers: confirmation(key), input: { confirm: approved, expected_version: version }, expect,
   });
   for (const amount of [0, 1.1, '50000', true]) await create(amount, 'CREDIT_GIVEN', randomUUID(), 422);
+  const decimal = JSON.stringify(draftInput(customer, 50000, 'CREDIT_GIVEN')).replace('50000', '50000.0');
+  const decimalResponse = await handler(new Request(origin + '/v1/ledger/drafts', {
+    method: 'POST', headers: { origin, cookie, 'content-type': 'application/json', ...creation(randomUUID()) },
+    body: decimal,
+  }));
+  assert.equal(decimalResponse.status, 422);
   const createKey = randomUUID();
   const { data: draft } = await create(51000, 'CREDIT_GIVEN', createKey);
   assert.deepEqual((await create(51000, 'CREDIT_GIVEN', createKey)).data, draft);
@@ -161,5 +167,13 @@ test('rate limits persist across rejected actions', async () => {
   const invalid = { method: 'POST', cookie, input: { question: '' }, expect: 422 };
   for (let index = 0; index < 20; index++) await call('/assistant/questions', invalid);
   const response = await call('/assistant/questions', { ...invalid, expect: 429 });
+  assert.equal(response.data.error.code, 'RATE_LIMITED');
+});
+
+test('session creation bounds include malformed requests', async () => {
+  const clientAddress = '192.0.2.100';
+  for (let index = 0; index < 8; index++)
+    await call('/demo/session', { method: 'POST', input: { invalid: true }, clientAddress, expect: 422 });
+  const response = await call('/demo/session', { method: 'POST', clientAddress, expect: 429 });
   assert.equal(response.data.error.code, 'RATE_LIMITED');
 });

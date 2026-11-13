@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { openDatabase } from '../src/database.mjs';
 
-const { pool, transact } = openDatabase(process.env.HOSTED_MIGRATION_DATABASE_URL, process.env.HOSTED_DATABASE_CA);
+const { pool, transact } = openDatabase(process.env.HOSTED_MIGRATION_DATABASE_URL, process.env.HOSTED_DATABASE_CA, { migration: true });
 const directory = new URL('../migrations/', import.meta.url);
 try {
   await transact(async db => {
