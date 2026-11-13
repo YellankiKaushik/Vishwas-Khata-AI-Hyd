@@ -4,11 +4,23 @@ import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { Readable } from 'node:stream';
+import { publicReleaseReady } from '../scripts/preflight.mjs';
 import { createHandler } from './handler.mjs';
 import { openDatabase } from './database.mjs';
 
+const certificateFile = process.env.HOSTED_LOCAL_TLS_CERT_FILE;
+const keyFile = process.env.HOSTED_LOCAL_TLS_KEY_FILE;
+const bindAddress = process.env.HOSTED_BIND_ADDRESS || '127.0.0.1';
+const localTLS = Boolean(certificateFile || keyFile);
+if (!localTLS && !publicReleaseReady) throw new Error('HOSTED_PUBLIC_RELEASE_GATE_CLOSED');
+
 const origin = process.env.HOSTED_PUBLIC_ORIGIN;
-const expectedHost = new URL(origin).host;
+const publicUrl = new URL(origin);
+if (localTLS && (!certificateFile || !keyFile || bindAddress !== '127.0.0.1' ||
+    !['127.0.0.1', 'localhost'].includes(publicUrl.hostname))) {
+  throw new Error('INVALID_LOCAL_TLS_CONFIGURATION');
+}
+const expectedHost = publicUrl.host;
 const root = resolve(process.env.HOSTED_WEB_DIST || '../web/dist');
 const { transact } = openDatabase(process.env.HOSTED_DATABASE_URL, process.env.HOSTED_DATABASE_CA);
 const handle = createHandler({ transact, origin, secret: process.env.HOSTED_SESSION_SECRET,
@@ -24,14 +36,6 @@ const security = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
-const certificateFile = process.env.HOSTED_LOCAL_TLS_CERT_FILE;
-const keyFile = process.env.HOSTED_LOCAL_TLS_KEY_FILE;
-const bindAddress = process.env.HOSTED_BIND_ADDRESS || '127.0.0.1';
-const localTLS = Boolean(certificateFile || keyFile);
-if (localTLS && (!certificateFile || !keyFile || bindAddress !== '127.0.0.1' ||
-    !['127.0.0.1', 'localhost'].includes(new URL(origin).hostname))) {
-  throw new Error('INVALID_LOCAL_TLS_CONFIGURATION');
-}
 async function serve(req, res) {
   try {
     // Run behind an HTTPS terminator that preserves Host and can reach the private listener.

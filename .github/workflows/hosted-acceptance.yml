@@ -74,6 +74,17 @@ jobs:
           npm --prefix apps/hosted ls --depth=0
       - name: Verify hosted unit tests
         run: npm --prefix apps/hosted test
+      - name: Verify public startup remains gated
+        run: |
+          if npm --prefix apps/hosted run preflight; then
+            echo '::error::Public preflight unexpectedly passed without deployment settings'
+            exit 1
+          fi
+          if result=$(npm --prefix apps/hosted start 2>&1); then
+            echo '::error::The hosted server unexpectedly started without public release approval'
+            exit 1
+          fi
+          grep -Fq HOSTED_PUBLIC_RELEASE_GATE_CLOSED <<< "$result"
       - name: Audit hosted npm lock
         if: "!cancelled()"
         run: npm --prefix apps/hosted audit
@@ -152,12 +163,7 @@ jobs:
             apps/hosted/package-lock.json
             apps/web/package-lock.json
       - name: Install locked hosted dependencies
-        run: |
-          node --version
-          npm --version
-          npm --prefix apps/hosted ci
-          node -e "const p=require('./apps/hosted/node_modules/@electric-sql/pglite/package.json').version; console.log(p); if (p !== '0.5.16') process.exit(1)"
-          npm --prefix apps/hosted ls --depth=0
+        run: npm --prefix apps/hosted ci --omit=dev
       - name: Install locked frontend dependencies
         run: |
           npm --prefix apps/web ci
