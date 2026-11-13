@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Response } from "@playwright/test";
+
+const followupResponse = (response: Response) =>
+  new URL(response.url()).pathname === "/v1/followups/drafts" && response.request().method() === "POST";
+
+type ClipboardWitness = Window & { __followupClipboard: { writes: number } };
 
 test("two isolated browsers complete the hosted ledger and review workflow", async ({ browser, baseURL }) => {
   const origin = new URL(baseURL!).origin;
@@ -7,6 +12,13 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
   const desktop = await browser.newContext({ baseURL });
   const mobile = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 } });
   try {
+    await desktop.addInitScript(() => {
+      const witness = { writes: 0 };
+      Object.defineProperty(window, "__followupClipboard", { value: witness });
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        value: async () => { witness.writes++; },
+      });
+    });
     if (token) {
       for (const context of [desktop, mobile]) {
         const bootstrap = await context.request.get("/", {
@@ -52,16 +64,16 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     const customer = (await get("/customers")).find((row: { display_name: string }) => row.display_name === "Ramesh");
     expect((await mobile.request.get("/v1/customers/" + customer.id + "/balance", { maxRedirects: 0 })).status()).toBe(404);
 
-    const financial = async (rupees: number, type: string, balance: number) => {
-      await page.getByRole("button", { name: "Record transaction" }).click();
-      const capture = page.getByRole("dialog", { name: "Record a transaction" });
+    const financial = async (tab: Page, rupees: number, type: string, balance: number) => {
+      await tab.getByRole("button", { name: "Record transaction" }).click();
+      const capture = tab.getByRole("dialog", { name: "Record a transaction" });
       await capture.getByRole("combobox", { name: /customer/i }).selectOption(customer.id);
       await capture.getByRole("combobox", { name: "Transaction type" }).selectOption(type);
       await capture.getByRole("textbox", { name: "Exact amount in rupees" }).fill(String(rupees));
       await capture.getByRole("button", { name: /review draft/i }).click();
-      const review = page.getByRole("dialog", { name: "Review your entry" });
+      const review = tab.getByRole("dialog", { name: "Review your entry" });
       await expect(review).toBeVisible();
-      const posted = page.waitForResponse(response => /\/v1\/ledger\/drafts\/[^/]+\/confirm$/.test(new URL(response.url()).pathname)
+      const posted = tab.waitForResponse(response => /\/v1\/ledger\/drafts\/[^/]+\/confirm$/.test(new URL(response.url()).pathname)
         && response.request().method() === "POST");
       await review.getByRole("button", { name: /confirm.*post|confirm.*entry/i }).click();
       const confirmation = await posted;
@@ -81,8 +93,8 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
       await expect(review).toHaveCount(0);
       await expect.poll(async () => (await get("/customers/" + customer.id + "/balance")).outstanding_balance_paise).toBe(balance);
     };
-    await financial(500, "CREDIT_GIVEN", 50000);
-    await financial(200, "REPAYMENT_RECEIVED", 30000);
+    await financial(page, 500, "CREDIT_GIVEN", 50000);
+    await financial(page, 200, "REPAYMENT_RECEIVED", 30000);
     await page.getByRole("button", { name: "Merchant Assistant" }).click();
     await page.getByLabel("Commitment customer").selectOption(customer.id);
     await page.getByRole("button", { name: "Review new commitment" }).click();
@@ -104,15 +116,45 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     await page.getByRole("button", { name: "Ask assistant" }).click();
     await expect(page.getByText(/Ramesh's recorded outstanding balance is/)).toBeVisible();
     await due.click();
-    await page.getByRole("button", { name: "Confirm review and prepare draft" }).click();
-    await expect(page.getByText("Draft not sent", { exact: true })).toBeVisible();
-    await financial(100, "REPAYMENT_RECEIVED", 20000);
-    const staleResponse = page.waitForResponse(response =>
-      new URL(response.url()).pathname === "/v1/followups/drafts" && response.status() === 409);
-    await page.getByRole("button", { name: "Check freshness and copy" }).click();
-    expect((await (await staleResponse).json()).error.code).toBe("STALE_EVIDENCE");
-    await expect(page.getByText("Draft not sent", { exact: true })).toHaveCount(0);
-    await financial(500, "CREDIT_GIVEN", 70000);
+    const prepare = page.getByRole("button", { name: "Confirm review and prepare draft" });
+    const unsent = page.getByText("Draft not sent", { exact: true });
+    const copy = page.getByRole("button", { name: "Check freshness and copy" });
+    const [draft] = await Promise.all([page.waitForResponse(followupResponse), prepare.click()]);
+    expect(draft.status()).toBe(200);
+    expect(await draft.json()).toMatchObject({ status: "DRAFT_NOT_SENT", sent: false, outstanding_paise: 30000 });
+    await expect(unsent).toBeVisible();
+
+    // Posting in this tab refreshes the workspace and discards its preview.
+    // A second tab in the same session can change the ledger while this draft remains open.
+    const repaymentTab = await desktop.newPage();
+    await repaymentTab.goto(origin);
+    await financial(repaymentTab, 100, "REPAYMENT_RECEIVED", 20000);
+    await repaymentTab.close();
+    const updated = await get("/commitments/" + commitment.id);
+    expect(updated.outstanding_paise).toBe(20000);
+    expect(updated.evidence_hash).not.toBe(commitment.evidence_hash);
+    await expect(copy, "The original tab should still offer a freshness check").toBeEnabled();
+    const [stale] = await Promise.all([
+      page.waitForResponse(followupResponse, { timeout: 5000 }),
+      copy.click(),
+    ]);
+    const code = (await stale.json().catch(() => null))?.error?.code;
+    const safeCode = typeof code === "string" && /^[A-Z_]{1,40}$/.test(code) ? code : "UNKNOWN";
+    console.log(`Follow-up freshness POST: HTTP ${stale.status()}, code ${safeCode}`);
+    expect({ status: stale.status(), code: safeCode }).toEqual({ status: 409, code: "STALE_EVIDENCE" });
+    expect(stale.request().postDataJSON().facts_hash === commitment.evidence_hash).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as ClipboardWitness).__followupClipboard.writes)).toBe(0);
+    await expect(unsent).toHaveCount(0);
+    await expect(copy).toHaveCount(0);
+
+    await due.click();
+    const [fresh] = await Promise.all([page.waitForResponse(followupResponse), prepare.click()]);
+    expect(fresh.status()).toBe(200);
+    expect(await fresh.json()).toMatchObject({ status: "DRAFT_NOT_SENT", sent: false, outstanding_paise: 20000 });
+    await expect(unsent).toBeVisible();
+    await financial(page, 500, "CREDIT_GIVEN", 70000);
+    await expect(unsent, "A posting in the current tab should clear the preview").toHaveCount(0);
+    await expect(copy).toHaveCount(0);
     expect((await get("/commitments/" + commitment.id)).due_status).toBe("REVIEW_REQUIRED");
     const wrongTenant = await mobile.request.patch("/v1/commitments/" + commitment.id, {
       maxRedirects: 0,
