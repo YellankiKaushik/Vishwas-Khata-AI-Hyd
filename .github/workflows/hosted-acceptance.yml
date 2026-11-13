@@ -132,6 +132,9 @@ jobs:
         run: npm --prefix apps/web run build
       - name: Verify original Hyderabad demo on loopback
         run: .venv/bin/python -X utf8 scripts/smoke_local_http.py
+      - name: Repeat the voice confirmation regression
+        working-directory: apps/web
+        run: VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test e2e/voice.spec.ts --grep "recorded real STT response replay" --repeat-each 3 --trace off
       - name: Verify local Chromium flow
         working-directory: apps/web
         run: VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test --trace off

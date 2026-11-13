@@ -1,6 +1,7 @@
 import { test, expect } from "./offline-test";
 import fs from "node:fs/promises";
 import { syntheticMediaPath } from "./media-fixture";
+import type { Draft, Entry, Receipt } from "../src/api";
 test.use({
   permissions: ["microphone"],
   launchOptions: {
@@ -427,11 +428,15 @@ test("recorded real STT response replay requires deliberate transcription, custo
     const transcript = responses[transcriptions++];
     return route.fulfill({ json: { transcription_id: 'recorded-response-' + transcriptions, transcript, language_detected: 'en-IN', source: 'FIXTURE', provider: 'RECORDED_VENDOR_RESPONSE_REPLAY', model: 'saaras:v4' } });
   });
-  for (const [index, expectedAmount] of ['₹500', '₹200'].entries()) {
+  const amounts = ['₹500', '₹200'];
+  const balances = [50000, 30000];
+  for (const [index, expectedAmount] of amounts.entries()) {
     await page.getByRole('button', { name: 'Record transaction', exact: true }).click();
     await page.getByRole('button', { name: 'Type / speak a sentence', exact: true }).click();
     await page.getByLabel('Customer (select the exact ID)').selectOption(cid);
-    const before = (await (await page.request.get('/v1/ledger/entries')).json()).items.length;
+    const beforeResponse = await page.request.get('/v1/ledger/entries');
+    expect(beforeResponse.status()).toBe(200);
+    const before: Entry[] = (await beforeResponse.json()).items;
     await record(page);
     expect(transcriptions).toBe(index);
     const player = page.getByLabel('Preview synthetic recording');
@@ -440,11 +445,55 @@ test("recorded real STT response replay requires deliberate transcription, custo
     await expect(page.getByLabel('Sentence or corrected transcript')).toHaveValue(responses[index]);
     // Explicit merchant edit verifies the correction path, even though recognized fields are correct.
     await page.getByLabel('Sentence or corrected transcript').fill(index === 0 ? 'Ramesh took 500 rupees credit' : 'Ramesh returned 200 rupees');
-    await page.getByRole('button', { name: 'Review draft', exact: true }).click();
-    await expect(page.getByRole('dialog').getByText(expectedAmount, { exact: true })).toBeVisible();
-    expect((await (await page.request.get('/v1/ledger/entries')).json()).items.length).toBe(before);
-    await page.getByRole('button', { name: 'Confirm and post', exact: true }).click();
-    await expect(page.getByText('Recorded, with your confirmation.')).toBeVisible();
+    const [draftResponse] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/v1/ledger/drafts'),
+      page.getByRole('button', { name: 'Review draft', exact: true }).click(),
+    ]);
+    expect(draftResponse.status()).toBe(201);
+    const draft: Draft = await draftResponse.json();
+    expect(draft.proposed.customer_id).toBe(cid);
+    const review = page.getByRole('dialog', { name: 'Review your entry' });
+    await expect(review.getByText(expectedAmount, { exact: true })).toBeVisible();
+    expect((await (await page.request.get('/v1/ledger/entries')).json()).items).toHaveLength(before.length);
+
+    const [confirmation] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === `/v1/ledger/drafts/${draft.draft_id}/confirm`),
+      review.getByRole('button', { name: 'Confirm and post', exact: true }).click(),
+    ]);
+    // The local API returns 201 for a new posting and 200 for an idempotent replay.
+    expect(confirmation.status()).toBe(201);
+    const receipt: Receipt = await confirmation.json();
+    expect(receipt).toMatchObject({
+      customer_id: cid,
+      draft_id: draft.draft_id,
+      outstanding_balance_paise: balances[index],
+    });
+    const confirmationRequest = confirmation.request();
+    const key = await confirmationRequest.headerValue('idempotency-key');
+    expect(key).toBeTruthy();
+    const replay = await page.request.post(`/v1/ledger/drafts/${draft.draft_id}/confirm`, {
+      headers: { 'Idempotency-Key': key! },
+      data: confirmationRequest.postDataJSON(),
+    });
+    expect(replay.status()).toBe(200);
+    expect(await replay.json()).toEqual(receipt);
+    await expect.poll(async () => {
+      const response = await page.request.get(`/v1/customers/${cid}/balance`);
+      expect(response.status()).toBe(200);
+      return (await response.json()).outstanding_balance_paise;
+    }).toBe(receipt.outstanding_balance_paise);
+
+    const afterResponse = await page.request.get('/v1/ledger/entries');
+    expect(afterResponse.status()).toBe(200);
+    const after: Entry[] = (await afterResponse.json()).items;
+    const priorIds = new Set(before.map(entry => entry.entry_id));
+    expect(after).toHaveLength(before.length + 1);
+    expect(after.filter(entry => !priorIds.has(entry.entry_id))).toEqual([
+      expect.objectContaining({ entry_id: receipt.entry_id, customer_id: cid, draft_id: draft.draft_id }),
+    ]);
+    await expect(review).toBeHidden();
   }
   expect(transcriptions).toBe(2);
   expect((await (await page.request.get(`/v1/customers/${cid}/balance`)).json()).outstanding_balance_paise).toBe(30000);
