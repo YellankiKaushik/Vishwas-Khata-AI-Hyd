@@ -1,0 +1,7 @@
+* text=auto eol=lf
+Project_Vishwas_Khata_V3/** -text
+*.png binary
+*.pptx binary
+*.mp4 binary
+*.pdf binary
+*.zip binary

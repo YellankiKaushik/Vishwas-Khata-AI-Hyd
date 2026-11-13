@@ -1,0 +1,37 @@
+PASS | 49 template section headings, no duplicates
+PASS | 218 subsection dispositions
+PASS | V3 version and honest source status
+PASS | Original Hyderabad ideas retained
+PASS | V3 substantial technical delta
+PASS | Valid documented OpenAPI format
+PASS | Unique operation IDs
+PASS | 23 operation IDs / 22 paths
+PASS | No duplicate query/path parameters
+PASS | Every URL placeholder declared
+PASS | Every internal contract ref resolves
+PASS | No Paytm API implied
+PASS | Observation void/replay design present
+PASS | No false total cash sales in normative API
+PASS | ObservationSaleCreate requires client_operation_id
+PASS | ObservationVisitCreate requires client_operation_id
+PASS | Fixture synthetic and 500-300 case
+PASS | apply migration 001_initial.sql
+PASS | apply migration 002_integrity_hardening.sql
+PASS | apply migration 003_v3_contract_hardening.sql
+PASS | DB foreign keys enabled, checks pass
+PASS | trigger trg_financial_post_matches_draft_v3
+PASS | trigger trg_confirmed_draft_immutable_v3
+PASS | trigger trg_confirmed_requires_post_v3
+PASS | trigger trg_sales_no_update_v3
+PASS | trigger trg_visits_no_delete_v3
+PASS | trigger trg_void_source_exists_v3
+PASS | trigger trg_draft_economic_edits_version_v3
+PASS | Six new ADRs
+PASS | 70 app acceptance scenarios identified, unverified
+PASS | 25 FR trace links
+PASS | No false source proof in trace links
+PASS | Reference/domain tests pass
+PASS | 38 or more reference test cases
+Total reference tests: 38
+
+SCOPE LIMIT: Static document/contract/migration/SQLite and offline reference tests only. No deployed server, no browser, no authenticated Sarvam, no Paytm API, no data privacy certification, no merchant pilot.

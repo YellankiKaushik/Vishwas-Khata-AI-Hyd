@@ -1,0 +1,25 @@
+sequenceDiagram
+  actor M as Merchant
+  participant W as Browser UI
+  participant A as FastAPI
+  participant V as ASR/extraction adapter
+  participant G as Draft guard
+  participant D as SQLite journal DB
+  M->>W: Speak "Ramesh took 500 rupees credit"
+  W->>A: POST /v1/voice/transcriptions (audio)
+  A->>V: Transcribe (safe request)
+  V-->>A: Untrusted transcript
+  A-->>W: Transcript + status
+  W->>A: POST /v1/ledger/drafts (transcript)
+  A->>V: Structured intent extraction (optional)
+  V-->>A: Untrusted draft JSON
+  A->>G: Parse, validate, resolve customer
+  G-->>A: NEEDS_REVIEW / AWAITING_CONFIRMATION
+  A-->>W: Draft preview (no write)
+  M->>W: Correct if needed, click Confirm
+  W->>A: POST /v1/ledger/drafts/{id}/confirm (idempotency key, version)
+  A->>G: Verify session, merchant, draft, amount
+  G->>D: BEGIN; lock/check; insert journal + audit; COMMIT
+  D-->>A: Posted entry, authoritative balance
+  A-->>W: 201 Created or stable duplicate response
+  W-->>M: Confirmation and updated ledger

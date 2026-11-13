@@ -1,0 +1,26 @@
+PASS — 49 numbered template sections
+PASS — 218 template subsection crosswalk
+PASS — V2 version marker
+PASS — source honesty
+PASS — deep documentation size — 35193
+PASS — original feature mapping
+PASS — new integrity control
+PASS — time boundary documented
+PASS — OpenAPI 3.1
+PASS — 20 API paths
+PASS — 21 unique API operations — 21
+PASS — no missing contract refs
+PASS — required new API flows
+PASS — no Paytm API endpoints
+PASS — synthetic fixture marker
+PASS — reference 500-to-300
+PASS — migrations apply
+PASS — foreign keys enabled
+PASS — 4 new integrity triggers present
+PASS — no FK violations
+PASS — 15 primary FR links
+PASS — 50 case IDs documented
+PASS — 16 ADRs documented
+PASS — reference finance tests
+
+Verification scope: static docs + OpenAPI parse + schema migration + isolated SQLite finance reference tests only. NO API server, browser, Sarvam integration, Paytm integration, personal data processing or merchant pilot was run.

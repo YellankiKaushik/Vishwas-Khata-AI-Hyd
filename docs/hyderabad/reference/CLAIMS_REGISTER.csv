@@ -1,0 +1,11 @@
+claim_id,claim,evidence_state_at_design_date,permitted_pitch_wording,new_evidence_uri,approved_by
+CLAIM-001,Immutable audited ledger with human approval,Existing source/CI evidence,"""Existing source code implements an audited ledger with documented tests; a Hyderabad rerun is pending""",,NOT_APPROVED
+CLAIM-002,Live grounded AI follow-up,Not built/verified,"""Hyderabad feature proposed; implementing""",,NOT_APPROVED
+CLAIM-003,Due-date commitments,Not built/verified,"""Designed planned workflow""",,NOT_APPROVED
+CLAIM-004,Supports Telugu live speech,Not generally verified,"""Regional typed fixtures; live Telugu ASR not yet verified""",,NOT_APPROVED
+CLAIM-005,Hosted demo is live,Not independently verified,"""Gated hosted backend implementation; remote promotion pending""",,NOT_APPROVED
+CLAIM-006,No unsupervised money action,Baseline domain source plus target design,"""Financial writes require merchant confirmation; AI additions will not bypass it""",,NOT_APPROVED
+CLAIM-007,Improves merchant collections,No field evidence,"""Impact hypothesis, not observed outcome""",,NOT_APPROVED
+CLAIM-008,All Hyderabad work new from scratch,False provenance,Never claim; disclose existing codebase,,NOT_APPROVED
+CLAIM-009,Sent a WhatsApp reminder,No integration,Never claim; draft only,,NOT_APPROVED
+CLAIM-010,Compliance-certified finance solution,No external review,Never claim,,NOT_APPROVED

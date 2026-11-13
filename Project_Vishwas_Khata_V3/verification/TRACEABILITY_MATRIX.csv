@@ -1,0 +1,16 @@
+requirement_id,component,api,storage,test_ids,implementation_evidence,status
+FR-001,CMP-UI|CMP-API,GET /v1/merchants/me,merchants,T-001|T-016,TBD,DESIGN_ONLY
+FR-002,CMP-VOICE,POST /v1/voice/transcriptions,None,T-002|T-003|T-004,TBD,DESIGN_ONLY
+FR-003,CMP-EXTRACT|CMP-GUARD,POST /v1/ledger/drafts,ledger_drafts,T-004|T-005|T-028,TBD,DESIGN_ONLY
+FR-004,CMP-GUARD,PATCH /v1/ledger/drafts/{draft_id},ledger_drafts,T-007|T-029,TBD,DESIGN_ONLY
+FR-005,CMP-LEDGER,POST /v1/ledger/drafts/{draft_id}/confirm,ledger_entries|idempotency_records|audit_events,T-006|T-008|T-021|T-036,TBD,DESIGN_ONLY
+FR-006,CMP-LEDGER,GET /v1/ledger/entries|GET /v1/customers/{customer_id}/balance,ledger_entries,T-009|T-022,TBD,DESIGN_ONLY
+FR-007,CMP-GUARD|CMP-LEDGER,POST /v1/ledger/drafts/{draft_id}/confirm,ledger_entries,T-008|T-030,TBD,DESIGN_ONLY
+FR-008,CMP-LEDGER,POST /v1/ledger/entries/{entry_id}/reverse,ledger_entries,T-026|T-031|T-039|T-040,TBD,DESIGN_ONLY
+FR-009,CMP-DATA,POST /v1/observations/sales|POST /v1/observations/visits,sales_events|visit_events,T-010|T-032|T-037,TBD,DESIGN_ONLY
+FR-010,CMP-ANALYTICS,GET /v1/insights/daily,sales_events|visit_events|ledger_entries,T-010|T-012,TBD,DESIGN_ONLY
+FR-011,CMP-ANALYTICS,GET /v1/insights/daily,visit_events,T-011|T-020,TBD,DESIGN_ONLY
+FR-012,CMP-BRIEF,GET /v1/briefings/daily,briefing_snapshots,T-012|T-018|T-019,TBD,DESIGN_ONLY
+FR-013,CMP-VOICE,POST /v1/briefings/speech,briefing_snapshots,T-013|T-027,TBD,DESIGN_ONLY
+FR-014,CMP-ACTIONS,GET /v1/suggestions|PATCH /v1/suggestions/{id},suggestions,T-014|T-033,TBD,DESIGN_ONLY
+FR-015,CMP-DATA,CLI demo-seed,all synthetic fixture tables,T-015|T-034,TBD,DESIGN_ONLY

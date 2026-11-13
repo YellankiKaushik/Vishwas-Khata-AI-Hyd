@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vishwas-khata:hyd:ai-decision:v3:PROPOSED",
+  "title": "UntrustedAssistantDecisionV3",
+  "description": "Model may suggest intent and approved narrative template, NOT authoritative rupee amounts, dates, customer IDs, or free-form financial claims. Server renders verified facts independently.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "intent", "template_id", "proposed_evidence_ids", "language"],
+  "properties": {
+    "decision": {"enum": ["ANSWER", "CLARIFY", "INSUFFICIENT_DATA"]},
+    "intent": {"enum": ["DUE_COMMITMENTS", "CUSTOMER_BALANCE", "RECORDED_ACTIVITY", "DRAFT_FOLLOWUP", "UNKNOWN"]},
+    "template_id": {"enum": ["BALANCE_SUMMARY", "DUE_LIST", "DUE_EXPLANATION", "POLITE_REMINDER", "ACTIVITY_SUMMARY", "ASK_CUSTOMER", "NO_EVIDENCE"]},
+    "language": {"enum": ["en-IN", "hi-IN", "te-IN"]},
+    "proposed_evidence_ids": {
+      "type": "array", "uniqueItems": true, "maxItems": 20,
+      "items": {"type": "string", "minLength": 1, "maxLength": 100}
+    }
+  }
+}

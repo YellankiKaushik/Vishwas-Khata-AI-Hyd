@@ -1,0 +1,11 @@
+flowchart LR
+  Push[Push / PR] --> Front[Frontend lint + typecheck + build]
+  Push --> Back[Backend lint + typing + pytest]
+  Push --> Contract[OpenAPI validation + diff]
+  Push --> Data[SQLite migrate + seed + reconcile]
+  Push --> Scan[Dependency + secret check]
+  Front --> Gate[Gate]
+  Back --> Gate
+  Contract --> Gate
+  Data --> Gate
+  Scan --> Gate

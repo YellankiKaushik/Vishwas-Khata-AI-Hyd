@@ -1,0 +1,10 @@
+{
+  "classification": "HISTORICAL_APPROVED_TTS_SNAPSHOT_FOR_LOCAL_REPLAY_ONLY",
+  "facts_hash": "289ad595f2909c3df2a6a7d4f76d9ad7114aca225e080e7042a7e8b1a8a63ff0",
+  "characters": 1008,
+  "text": "Recorded sales observations: ₹9,100; PARTIAL_UNVERIFIED, not complete revenue. Credit given: ₹0; repayments recorded: ₹0. Net receivable change including corrections: ₹0. Credit is not sales; repayments do not prove bank or Paytm settlement.\n\nNEEDS_MORE_RECORDS: review customer labels, dated journal entries and recorded sales coverage. Observations remain partial and unverified. Recordkeeping completeness only; not loan eligibility, underwriting or approval.\n\nPriya: no visit recorded in 12 days as of 2026-10-27. Median recorded interval: 4 days; threshold: 8 days. Recorded dates: 2026-10-07, 2026-10-11, 2026-10-15. No visit recorded in the available sample; not proof that the customer stopped visiting. Consider a personal check-in if appropriate; this application sends nothing.\n\nINSUFFICIENT_DATA: no confirmed hourly activity baseline is recorded. More opening hours cannot be translated into additional sales or profit from these records. Keep recording observations before comparing a scenario.",
+  "audio_sha256": "b2d7ec4d7a73cfb036dca6f7d6dfab634e1e0767bcb4e8bb45a8fb1e4401aae8",
+  "source": "docs/evidence/f3-live-tts.json",
+  "physical_hearing_verified": false,
+  "new_provider_calls": 0
+}

@@ -1,0 +1,19 @@
+flowchart TB
+ subgraph U[Untrusted browser / device]
+  B[React merchant UI]
+  MIC[Microphone / audio data]
+ end
+ subgraph A[Application trust boundary]
+  API[Authenticated FastAPI gateway]
+  G[Domain guard and ledger]
+  DB[(Merchant DB)]
+ end
+ subgraph V[Third-party processor]
+  SAR[Sarvam model APIs]
+ end
+ MIC --> B
+ B -->|HTTPS, limited media| API
+ API -->|Validated calls| G
+ G -->|Tenant-scoped SQL| DB
+ API -->|Server key, minimum payload| SAR
+ SAR -->|Untrusted output| API

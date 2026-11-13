@@ -1,0 +1,365 @@
+openapi: 3.1.0
+info:
+  title: Vishwas-Khata-AI Hyderabad V3 Additive API DESIGN CONTRACT
+  version: 0.2.0-DESIGN-ONLY
+  description: >-
+    Not implemented on the reviewed main branch. Synthetic localhost demo design.
+    All ledger writes retain the existing authoritatively implemented confirmation
+    routes and database constraints. Caller never chooses merchant_id.
+servers:
+  - url: http://127.0.0.1:8000
+    description: Illustrative only; use the launcher-resolved loopback origin
+security:
+  - demoSessionCookie: []
+tags:
+  - name: Commitments
+  - name: Assistant
+  - name: FollowUps
+paths:
+  /v1/commitments:
+    post:
+      operationId: hydV3CreateCommitment
+      tags: [Commitments]
+      summary: Create one explicit customer-level repayment expectation; NOT a ledger entry
+      parameters:
+        - $ref: '#/components/parameters/ClientOperationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommitmentCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/CommitmentCreated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    get:
+      operationId: hydV3ListCommitments
+      tags: [Commitments]
+      summary: Merchant-scoped commitment listing; derived status is not stored debt allocation
+      parameters:
+        - { in: query, name: customer_id, schema: {type: string, maxLength: 128} }
+        - { in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 50, default: 20} }
+        - { in: query, name: cursor, schema: {type: string, maxLength: 256} }
+      responses:
+        '200':
+          description: Current and historical commitments in this merchant scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommitmentList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/commitments/{commitment_id}:
+    parameters:
+      - $ref: '#/components/parameters/CommitmentId'
+    get:
+      operationId: hydV3GetCommitment
+      tags: [Commitments]
+      responses:
+        '200':
+          description: Current snapshot and authoritative current customer balance
+          content: { application/json: {schema: { $ref: '#/components/schemas/CommitmentResponse' }} }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: hydV3UpdateCommitment
+      tags: [Commitments]
+      summary: Revise date/amount/note using exact expected_version and operator reason
+      parameters:
+        - $ref: '#/components/parameters/ClientOperationId'
+      requestBody:
+        required: true
+        content: { application/json: {schema: { $ref: '#/components/schemas/CommitmentEdit' }} }
+      responses:
+        '200': { $ref: '#/components/responses/CommitmentUpdated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/commitments/{commitment_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/CommitmentId'
+    post:
+      operationId: hydV3CancelCommitment
+      tags: [Commitments]
+      summary: Merchant cancels the EXPECTATION, never a financial ledger posting
+      parameters:
+        - $ref: '#/components/parameters/ClientOperationId'
+      requestBody:
+        required: true
+        content: { application/json: {schema: { $ref: '#/components/schemas/CommitmentDecision' }} }
+      responses:
+        '200': { $ref: '#/components/responses/CommitmentUpdated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/commitments/{commitment_id}/handle:
+    parameters:
+      - $ref: '#/components/parameters/CommitmentId'
+    post:
+      operationId: hydV3MarkCommitmentHandled
+      tags: [Commitments]
+      summary: Merchant marks follow-up expectation HANDLED; NOT payment, settlement, transfer, or message delivery
+      parameters:
+        - $ref: '#/components/parameters/ClientOperationId'
+      requestBody:
+        required: true
+        content: { application/json: {schema: { $ref: '#/components/schemas/CommitmentDecision' }} }
+      responses:
+        '200': { $ref: '#/components/responses/CommitmentUpdated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/commitments/{commitment_id}/events:
+    parameters:
+      - $ref: '#/components/parameters/CommitmentId'
+    get:
+      operationId: hydV3CommitmentHistory
+      tags: [Commitments]
+      summary: Immutable, merchant-scoped commitment change history
+      parameters:
+        - { in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 100, default: 50} }
+      responses:
+        '200':
+          description: Sequence of CREATED/UPDATED/CANCELLED/HANDLED change events
+          content: {application/json: {schema: { $ref: '#/components/schemas/CommitmentEvents' }}}
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/followups/due:
+    get:
+      operationId: hydV3GetDueList
+      tags: [FollowUps]
+      summary: Deterministic due-list with explicit-commitment and ledger evidence
+      description: >-
+        Server determines today's Asia/Kolkata business date. A synthetic test-mode
+        override is an internal test harness input, not an unrestricted public query.
+      parameters:
+        - { in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 50, default: 20} }
+      responses:
+        '200':
+          description: Authoritative ledger facts; missing/stale entries excluded or flagged
+          content: { application/json: {schema: { $ref: '#/components/schemas/DueList' }} }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/assistant/questions:
+    post:
+      operationId: hydV3AskAssistant
+      tags: [Assistant]
+      summary: Model may suggest intent/template; server renders facts, numbers and dates
+      requestBody:
+        required: true
+        content: { application/json: {schema: { $ref: '#/components/schemas/AssistantQuestion' }} }
+      responses:
+        '200':
+          description: Validated rendered response, including deterministic fallback
+          content: { application/json: {schema: { $ref: '#/components/schemas/AssistantResponse' }} }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/followups/drafts:
+    post:
+      operationId: hydV3DraftFollowup
+      tags: [FollowUps]
+      summary: Reviewable unsent message; hard-coded sent=false; no delivery endpoint
+      requestBody:
+        required: true
+        content: { application/json: {schema: { $ref: '#/components/schemas/FollowupDraftRequest' }} }
+      responses:
+        '200':
+          description: Reviewable draft, NOT_SENT; factual slots rendered by server
+          content: { application/json: {schema: { $ref: '#/components/schemas/FollowupDraft' }} }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/assistant/status:
+    get:
+      operationId: hydV3AssistantStatus
+      tags: [Assistant]
+      summary: Feature availability, supported verified locales and remaining quota status; no secrets
+      responses:
+        '200':
+          description: Dynamic feature availability; NOT evidence of live provider success
+          content: { application/json: {schema: { $ref: '#/components/schemas/AssistantStatus' }} }
+components:
+  securitySchemes:
+    demoSessionCookie:
+      type: apiKey
+      in: cookie
+      name: vishwas_demo_session
+      description: Illustrative cookie name only; match actual local session implementation before shipping
+  parameters:
+    CommitmentId:
+      in: path
+      name: commitment_id
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 128}
+    ClientOperationId:
+      in: header
+      name: Client-Operation-Id
+      required: true
+      description: >-
+        Opaque stable operation ID per merchant; exact same request replays original
+        receipt, differing request digest returns 409. Server must check replay first.
+      schema: {type: string, minLength: 8, maxLength: 128}
+  schemas:
+    CommitmentCreate:
+      type: object
+      additionalProperties: false
+      required: [customer_id, expected_date, reason]
+      properties:
+        customer_id: {type: string, minLength: 1, maxLength: 128}
+        expected_date: {type: string, format: date, description: Merchant-entered Asia/Kolkata business date; strict valid calendar day}
+        promised_amount_paise: {type: [integer, 'null'], minimum: 1, maximum: 100000000, description: Optional merchant-stated expectation; never allocated debt}
+        reason: {type: string, minLength: 3, maxLength: 240}
+        note: {type: [string, 'null'], maxLength: 240}
+    CommitmentEdit:
+      type: object
+      additionalProperties: false
+      required: [expected_version, expected_date, reason, review_latest_ledger]
+      properties:
+        expected_version: {type: integer, minimum: 1}
+        expected_date: {type: string, format: date}
+        promised_amount_paise: {type: [integer, 'null'], minimum: 1, maximum: 100000000}
+        reason: {type: string, minLength: 3, maxLength: 240}
+        note: {type: [string, 'null'], maxLength: 240}
+        review_latest_ledger: {const: true, description: Explicit merchant acknowledgement of latest balance}
+    CommitmentDecision:
+      type: object
+      additionalProperties: false
+      required: [expected_version, reason, confirm]
+      properties:
+        expected_version: {type: integer, minimum: 1}
+        reason: {type: string, minLength: 3, maxLength: 240}
+        confirm: {const: true}
+    CommitmentResponse:
+      type: object
+      additionalProperties: false
+      required: [id, customer_id, state, expected_date, version, outstanding_paise, last_reviewed_ledger_hash, evidence_hash, status, event_id]
+      properties:
+        id: {type: string}
+        customer_id: {type: string}
+        state: {enum: [ACTIVE, CANCELLED, HANDLED]}
+        expected_date: {type: string, format: date}
+        promised_amount_paise: {type: [integer, 'null'], minimum: 1}
+        version: {type: integer, minimum: 1}
+        outstanding_paise: {type: integer, minimum: 0, description: Authoritative customer-level outstanding NOW; not allocated to this commitment}
+        last_reviewed_ledger_hash: {type: string, minLength: 64, maxLength: 64}
+        evidence_hash: {type: string, minLength: 64, maxLength: 64}
+        review_required: {type: boolean}
+        status: {const: RECORDED_EXPECTATION_NOT_PAYMENT}
+        event_id: {type: string}
+    CommitmentList:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/CommitmentResponse'}}
+        next_cursor: {type: [string, 'null']}
+    CommitmentEvents:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, commitment_id, new_version, event_type, created_at]
+            properties:
+              id: {type: string}
+              commitment_id: {type: string}
+              new_version: {type: integer, minimum: 1}
+              event_type: {enum: [CREATED, UPDATED, CANCELLED, HANDLED]}
+              created_at: {type: string, format: date-time}
+    DueList:
+      type: object
+      additionalProperties: false
+      required: [as_of_date_ist, facts_hash, items, coverage]
+      properties:
+        as_of_date_ist: {type: string, format: date}
+        facts_hash: {type: string, minLength: 64, maxLength: 64}
+        coverage: {const: RECORDED_LEDGER_AND_COMMITMENTS_ONLY}
+        items:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [customer_id, commitment_id, expected_date, outstanding_paise, evidence_ids, status]
+            properties:
+              customer_id: {type: string}
+              commitment_id: {type: string}
+              expected_date: {type: string, format: date}
+              outstanding_paise: {type: integer, minimum: 1}
+              expected_amount_paise: {type: [integer, 'null']}
+              evidence_ids: {type: array, maxItems: 20, items: {type: string}}
+              status: {enum: [DUE_TODAY, PAST_EXPECTED_DATE, REVIEW_REQUIRED]}
+    AssistantQuestion:
+      type: object
+      additionalProperties: false
+      required: [question, language, request_id]
+      properties:
+        question: {type: string, minLength: 1, maxLength: 500}
+        language: {enum: [en-IN, hi-IN, te-IN]}
+        customer_id: {type: [string, 'null'], maxLength: 128}
+        request_id: {type: string, minLength: 8, maxLength: 128}
+    AssistantResponse:
+      type: object
+      additionalProperties: false
+      required: [status, intent, provider_mode, as_of_date_ist, facts_hash, items, rendered_text, evidence_ids, coverage]
+      properties:
+        status: {enum: [ANSWER, CLARIFICATION, INSUFFICIENT_DATA, UNAVAILABLE]}
+        intent: {enum: [DUE_COMMITMENTS, CUSTOMER_BALANCE, RECORDED_ACTIVITY, DRAFT_FOLLOWUP, UNKNOWN]}
+        provider_mode: {enum: [DISABLED, MOCK, AUTHORIZED_LIVE]}
+        as_of_date_ist: {type: string, format: date}
+        facts_hash: {type: string}
+        items: {type: array, maxItems: 50, items: {type: object, description: Deterministic server-owned fact objects only}}
+        rendered_text: {type: string, maxLength: 700, description: Server-rendered approved template plus validated facts; never direct model numeric prose}
+        evidence_ids: {type: array, maxItems: 20, items: {type: string}}
+        coverage: {enum: [RECORDED_ONLY, INSUFFICIENT_DATA]}
+    FollowupDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [commitment_id, expected_version, language, facts_hash, confirm_review]
+      properties:
+        commitment_id: {type: string}
+        expected_version: {type: integer, minimum: 1}
+        language: {enum: [en-IN, hi-IN, te-IN]}
+        facts_hash: {type: string, minLength: 64, maxLength: 64}
+        confirm_review: {const: true}
+        tone: {enum: [POLITE]}
+    FollowupDraft:
+      type: object
+      additionalProperties: false
+      required: [status, sent, review_required, customer_id, outstanding_paise, text, evidence_ids, source_facts_hash]
+      properties:
+        status: {const: DRAFT_NOT_SENT}
+        sent: {const: false}
+        review_required: {const: true}
+        customer_id: {type: string}
+        outstanding_paise: {type: integer, minimum: 1}
+        text: {type: string, maxLength: 700}
+        evidence_ids: {type: array, maxItems: 20, items: {type: string}}
+        source_facts_hash: {type: string}
+    AssistantStatus:
+      type: object
+      additionalProperties: false
+      required: [enabled, provider_mode, verified_locales]
+      properties:
+        enabled: {type: boolean}
+        provider_mode: {enum: [DISABLED, MOCK, AUTHORIZED_LIVE]}
+        verified_locales: {type: array, items: {enum: [en-IN, hi-IN, te-IN]}}
+        reason_if_disabled: {type: [string, 'null']}
+  responses:
+    CommitmentCreated:
+      description: 201 created, or stored identical original response on exact retry
+      content: {application/json: {schema: {$ref: '#/components/schemas/CommitmentResponse'}}}
+    CommitmentUpdated:
+      description: 200 update, or identical original response on exact replay
+      content: {application/json: {schema: {$ref: '#/components/schemas/CommitmentResponse'}}}
+    Unauthorized: {description: 401 session absent or expired; no tenant details}
+    NotFound: {description: 404 nonexistent or outside-session merchant resource}
+    Conflict: {description: 409 stale version, duplicate active customer, changed facts hash or altered operation digest}
+    Invalid: {description: 422 invalid date/paise/fields/semantics; no side effects}
+    RateLimited: {description: 429 finite live AI quota exhausted; no paid retry}
+    Unavailable: {description: 503 DB/provider unavailable, no claim of posted finance}

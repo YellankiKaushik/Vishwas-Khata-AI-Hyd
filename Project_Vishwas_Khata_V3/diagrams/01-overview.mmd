@@ -1,0 +1,14 @@
+flowchart LR
+  Merchant[Merchant / demo operator] --> UI[React web/PWA interface]
+  UI --> API[FastAPI modular API]
+  API --> Voice[Voice adapter: ASR + TTS]
+  API --> Extract[Structured extraction adapter]
+  API --> Guard[Schema + policy + confirmation guard]
+  Guard --> Journal[Deterministic journal domain]
+  Journal --> DB[(SQLite MVP / PostgreSQL candidate)]
+  DB --> Insights[Deterministic metrics + churn signals]
+  Insights --> Brief[Evidence-bounded narrative]
+  Brief --> Voice
+  API --> UI
+  Vendor[(Sarvam APIs, server-side only)] --- Voice
+  Vendor --- Extract

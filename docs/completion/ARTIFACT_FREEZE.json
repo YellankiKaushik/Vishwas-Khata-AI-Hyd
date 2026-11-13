@@ -1,0 +1,8 @@
+{
+  "phase": "AUTHORIZED_RELEASE_PACKAGING",
+  "final_assets_allowed": true,
+  "explicit_release_switch_required": true,
+  "application_commit": "dbd2edb17725bdb6d7c4e2700d6ec7634b04d89c",
+  "authorization_source": "Human supplied FINAL HACKATHON RELEASE request on 31 October 2026, sections 5-6",
+  "provider_calls_authorized": false
+}

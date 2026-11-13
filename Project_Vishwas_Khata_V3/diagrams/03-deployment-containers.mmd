@@ -1,0 +1,10 @@
+flowchart TB
+  UI[Browser SPA] --> API[FastAPI process]
+  API -->|local function| INTERP[Interpreter + guard]
+  API -->|local function| JOURNAL[Ledger service]
+  API -->|local function| INSIGHT[Analytics + briefing]
+  API -->|HTTP| SAR[(Sarvam platform)]
+  INTERP -->|validated draft| JOURNAL
+  JOURNAL --> DB[(SQLite / PostgreSQL)]
+  INSIGHT --> DB
+  INSIGHT --> API

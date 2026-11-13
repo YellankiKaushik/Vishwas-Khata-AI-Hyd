@@ -1,0 +1,12 @@
+erDiagram
+  MERCHANTS ||--o{ CUSTOMERS : owns
+  MERCHANTS ||--o{ LEDGER_DRAFTS : owns
+  CUSTOMERS ||--o{ LEDGER_DRAFTS : referenced_by
+  LEDGER_DRAFTS ||--o| LEDGER_ENTRIES : confirmed_into
+  MERCHANTS ||--o{ LEDGER_ENTRIES : posts
+  CUSTOMERS ||--o{ LEDGER_ENTRIES : balances
+  MERCHANTS ||--o{ SALES_EVENTS : observes
+  CUSTOMERS ||--o{ VISIT_EVENTS : visits
+  MERCHANTS ||--o{ SUGGESTIONS : receives
+  MERCHANTS ||--o{ AUDIT_EVENTS : audits
+  MERCHANTS ||--o{ IDEMPOTENCY_RECORDS : scopes

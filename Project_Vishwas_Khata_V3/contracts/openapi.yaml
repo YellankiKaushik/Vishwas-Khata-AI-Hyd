@@ -1,0 +1,1313 @@
+openapi: 3.1.0
+info:
+  title: Vishwas Khata API (DESIGN — not deployed)
+  version: 0.3.0-proposed
+  description: V3 design-only merchant MVP API. Financial writes require explicit confirmation. No production implementation,
+    Paytm settlement integration, or tested Sarvam credentials. Synthetic-only demo.
+servers:
+- url: http://127.0.0.1:8000
+  description: Local synthetic demo, NOT public production
+security:
+- merchantSession: []
+tags:
+- name: System
+- name: Merchant
+- name: Voice
+- name: Ledger
+- name: Insights
+- name: Briefing
+- name: Suggestions
+paths:
+  /v1/health/live:
+    get:
+      operationId: liveHealth
+      tags:
+      - System
+      security: []
+      responses:
+        '200':
+          description: API process alive, not proof that database or vendor is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - version
+                properties:
+                  status:
+                    type: string
+                    const: alive
+                  version:
+                    type: string
+  /v1/merchants/me:
+    get:
+      operationId: getSelfMerchant
+      tags:
+      - Merchant
+      responses:
+        '200':
+          description: Server-resolved current merchant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+        '401':
+          $ref: '#/components/responses/Error'
+  /v1/voice/transcriptions:
+    post:
+      operationId: transcribeVoice
+      tags:
+      - Voice
+      description: Transcribe audio; DOES NOT POST money. `source` labels live/fixture/manual mode.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Candidate ≤10MB and ≤20s, actual limit configurable
+                language_hint:
+                  type: string
+                  enum:
+                  - hi-IN
+                  - te-IN
+                  - en-IN
+                  - auto
+                  default: auto
+      responses:
+        '200':
+          description: Untrusted transcript requiring review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transcription'
+        '413':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/ledger/drafts:
+    post:
+      operationId: createLedgerDraft
+      tags:
+      - Ledger
+      description: Model/manual interpretation into draft ONLY; no financial posting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDraft'
+      responses:
+        '201':
+          description: Created draft, must be reviewed and confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerDraft'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/ledger/drafts/{draft_id}:
+    parameters:
+    - $ref: '#/components/parameters/DraftId'
+    patch:
+      operationId: editLedgerDraft
+      tags:
+      - Ledger
+      description: Requires matching version; confirmed drafts immutable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditDraft'
+      responses:
+        '200':
+          description: Revised preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerDraft'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/ledger/drafts/{draft_id}/confirm:
+    parameters:
+    - $ref: '#/components/parameters/DraftId'
+    post:
+      operationId: confirmLedgerDraft
+      tags:
+      - Ledger
+      description: Only route converting a draft into a posted immutable financial event.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmDraft'
+      responses:
+        '201':
+          description: Posted exactly once
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerPostResult'
+        '200':
+          description: Replay of same idempotency key and fingerprint (same entry ID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerPostResult'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/ledger/drafts/{draft_id}/cancel:
+    parameters:
+    - $ref: '#/components/parameters/DraftId'
+    post:
+      operationId: cancelLedgerDraft
+      tags:
+      - Ledger
+      responses:
+        '200':
+          description: Terminal cancellation; no journal posting
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - draft_id
+                - state
+                properties:
+                  draft_id:
+                    type: string
+                  state:
+                    type: string
+                    const: CANCELLED
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/ledger/entries:
+    get:
+      operationId: listLedgerEntries
+      tags:
+      - Ledger
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Owner-only chronological entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LedgerEntry'
+                  next_cursor:
+                    type:
+                    - string
+                    - 'null'
+  /v1/ledger/entries/{entry_id}/reverse:
+    parameters:
+    - in: path
+      name: entry_id
+      required: true
+      schema:
+        type: string
+    post:
+      operationId: reverseLedgerEntry
+      tags:
+      - Ledger
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - confirm
+              - reason
+              properties:
+                confirm:
+                  type: boolean
+                  const: true
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 240
+      responses:
+        '201':
+          description: Compensating reversing entry; original is not changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerEntry'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/customers/{customer_id}/balance:
+    get:
+      operationId: customerBalance
+      tags:
+      - Ledger
+      parameters:
+      - in: path
+        name: customer_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Receivable amount from sum of signed journal rows
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - customer_id
+                - outstanding_balance_paise
+                - currency
+                properties:
+                  customer_id:
+                    type: string
+                  outstanding_balance_paise:
+                    type: integer
+                    minimum: 0
+                  currency:
+                    type: string
+                    const: INR
+        '404':
+          $ref: '#/components/responses/Error'
+  /v1/insights/daily:
+    get:
+      operationId: getDailyInsights
+      tags:
+      - Insights
+      parameters:
+      - $ref: '#/components/parameters/BusinessDate'
+      responses:
+        '200':
+          description: Deterministic facts, sales separated from credit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyInsights'
+  /v1/briefings/daily:
+    get:
+      operationId: getDailyBriefing
+      tags:
+      - Briefing
+      parameters:
+      - $ref: '#/components/parameters/BusinessDate'
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - hi-IN
+          - te-IN
+          - en-IN
+          default: en-IN
+      responses:
+        '200':
+          description: Four grounded text slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Briefing'
+  /v1/briefings/speech:
+    post:
+      operationId: speakApprovedBriefing
+      tags:
+      - Briefing
+      description: Server must lookup authoritative approved briefing; do not trust arbitrary client speech text.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - briefing_id
+              properties:
+                briefing_id:
+                  type: string
+      responses:
+        '200':
+          description: Approved synthesized audio
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/suggestions:
+    get:
+      operationId: listSuggestions
+      tags:
+      - Suggestions
+      responses:
+        '200':
+          description: Merchant-controlled suggestion drafts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Suggestion'
+                required:
+                - items
+  /v1/suggestions/{id}:
+    patch:
+      operationId: updateSuggestion
+      tags:
+      - Suggestions
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - state
+              properties:
+                state:
+                  type: string
+                  enum:
+                  - DISMISSED
+                  - DONE_MANUALLY
+      responses:
+        '200':
+          description: Updated state; does NOT send an external message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Suggestion'
+  /v1/health/ready:
+    get:
+      operationId: readinessHealth
+      tags:
+      - System
+      security: []
+      description: Readiness requires compatible schema+available database; not live provider uptime
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - schema_revision
+                properties:
+                  status:
+                    type: string
+                    const: ready
+                  schema_revision:
+                    type: string
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/customers:
+    get:
+      operationId: searchCustomers
+      tags:
+      - Merchant
+      parameters:
+      - in: query
+        name: query
+        required: false
+        schema:
+          type: string
+          minLength: 0
+          maxLength: 120
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      responses:
+        '200':
+          description: Only merchant-owned customer records; homonyms may both be returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createCustomer
+      tags:
+      - Merchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Synthetic observation created; merchant scope from trusted session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /v1/observations/sales:
+    post:
+      operationId: createSalesObservation
+      tags:
+      - Insights
+      description: 'Explicit merchant/synthetic sales observation. Must NEVER infer this from CREDIT_GIVEN, Paytm
+        feed or repayments. V3: idempotent client_operation_id; append-only event; corrections via void endpoint;
+        source=FIXTURE only in synthetic demo seed mode.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationSaleCreate'
+      responses:
+        '201':
+          description: Synthetic observation created; merchant scope from trusted session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '200':
+          description: Idempotent replay, returns original observation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationResult'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/observations/visits:
+    post:
+      operationId: createVisitObservation
+      tags:
+      - Insights
+      description: 'Explicit customer visit observation; not automatic Paytm identification. V3: idempotent client_operation_id;
+        append-only event; corrections via void endpoint; source=FIXTURE only in synthetic demo seed mode.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationVisitCreate'
+      responses:
+        '201':
+          description: Synthetic observation created; merchant scope from trusted session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '200':
+          description: Idempotent replay, returns original observation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationResult'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/insights/readiness:
+    get:
+      operationId: getRecordkeepingReadiness
+      tags:
+      - Insights
+      description: Bookkeeping record completeness only; not loan approval probability or lender eligibility.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResult'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/observations/sales/{observation_id}/void:
+    parameters:
+    - name: observation_id
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      operationId: voidSalesObservation
+      tags:
+      - Insights
+      description: Append one merchant-owned void record; observation never edited/deleted; voiding is idempotent
+        and recomputes facts. No direct fund movement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - reason
+              - confirm
+              properties:
+                reason:
+                  type: string
+                  minLength: 5
+                  maxLength: 240
+                confirm:
+                  type: boolean
+                  const: true
+      responses:
+        '201':
+          description: Voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationVoid'
+        '200':
+          description: Already voided, stable response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationVoid'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/observations/visits/{observation_id}/void:
+    parameters:
+    - name: observation_id
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      operationId: voidVisitsObservation
+      tags:
+      - Insights
+      description: Append one merchant-owned void record; observation never edited/deleted; voiding is idempotent
+        and recomputes facts. No direct fund movement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - reason
+              - confirm
+              properties:
+                reason:
+                  type: string
+                  minLength: 5
+                  maxLength: 240
+                confirm:
+                  type: boolean
+                  const: true
+      responses:
+        '201':
+          description: Voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationVoid'
+        '200':
+          description: Already voided, stable response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationVoid'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    merchantSession:
+      type: apiKey
+      in: cookie
+      name: vishwas_session
+      description: Future authenticated session. Local demo identity is only allowed on localhost with DEMO_MODE.
+  parameters:
+    DraftId:
+      in: path
+      name: draft_id
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    BusinessDate:
+      in: query
+      name: date
+      required: true
+      schema:
+        type: string
+        format: date
+  responses:
+    Error:
+      description: Standard error envelope, no stack traces or vendor secrets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    Merchant:
+      type: object
+      required:
+      - id
+      - display_name
+      - timezone
+      - simulated
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        timezone:
+          type: string
+          const: Asia/Kolkata
+        simulated:
+          type: boolean
+    Transcription:
+      type: object
+      required:
+      - transcription_id
+      - transcript
+      - language_detected
+      - source
+      properties:
+        transcription_id:
+          type: string
+        transcript:
+          type: string
+        language_detected:
+          type: string
+        provider:
+          type:
+          - string
+          - 'null'
+        model:
+          type:
+          - string
+          - 'null'
+        source:
+          type: string
+          enum:
+          - LIVE_VENDOR
+          - MANUAL
+          - FIXTURE
+        warnings:
+          type: array
+          items:
+            type: string
+    CreateDraft:
+      type: object
+      additionalProperties: false
+      required:
+      - transcript
+      - language
+      properties:
+        transcript:
+          type: string
+          maxLength: 500
+        language:
+          type: string
+          enum:
+          - hi-IN
+          - te-IN
+          - en-IN
+        customer_id:
+          type:
+          - string
+          - 'null'
+        parsed_override:
+          type:
+          - object
+          - 'null'
+          description: Untrusted proposed fields used for fixture/manual entry; server MUST validate merchant/customer/signed
+            amount; never bypass confirmation.
+    ProposedEntry:
+      type: object
+      required:
+      - entry_type
+      - customer_id
+      - amount_paise
+      - currency
+      properties:
+        entry_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - CREDIT_GIVEN
+          - REPAYMENT_RECEIVED
+          - null
+        customer_id:
+          type:
+          - string
+          - 'null'
+        amount_paise:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+        currency:
+          type: string
+          const: INR
+    LedgerDraft:
+      type: object
+      required:
+      - draft_id
+      - version
+      - state
+      - proposed
+      - needs_review
+      - expires_at
+      properties:
+        draft_id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        state:
+          type: string
+          enum:
+          - CREATED
+          - NEEDS_REVIEW
+          - AWAITING_CONFIRMATION
+          - CONFIRMED
+          - CANCELLED
+          - EXPIRED
+          - REJECTED
+        proposed:
+          $ref: '#/components/schemas/ProposedEntry'
+        needs_review:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+    EditDraft:
+      type: object
+      additionalProperties: false
+      required:
+      - expected_version
+      - entry_type
+      - customer_id
+      - amount_paise
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        entry_type:
+          type: string
+          enum:
+          - CREDIT_GIVEN
+          - REPAYMENT_RECEIVED
+        customer_id:
+          type: string
+        amount_paise:
+          type: integer
+          minimum: 1
+    ConfirmDraft:
+      type: object
+      additionalProperties: false
+      required:
+      - expected_version
+      - confirm
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        confirm:
+          type: boolean
+          const: true
+    LedgerEntry:
+      type: object
+      required:
+      - entry_id
+      - merchant_id
+      - customer_id
+      - entry_type
+      - amount_paise_signed
+      - posted_at
+      - simulated
+      properties:
+        entry_id:
+          type: string
+        merchant_id:
+          type: string
+        customer_id:
+          type: string
+        draft_id:
+          type:
+          - string
+          - 'null'
+        entry_type:
+          type: string
+          enum:
+          - CREDIT_GIVEN
+          - REPAYMENT_RECEIVED
+          - REVERSAL
+        amount_paise_signed:
+          type: integer
+        reverses_entry_id:
+          type:
+          - string
+          - 'null'
+        posted_at:
+          type: string
+          format: date-time
+        simulated:
+          type: boolean
+    LedgerPostResult:
+      type: object
+      required:
+      - entry_id
+      - draft_id
+      - state
+      - entry_type
+      - customer_id
+      - amount_paise
+      - outstanding_balance_paise
+      - posted_at
+      - simulated
+      properties:
+        entry_id:
+          type: string
+        draft_id:
+          type: string
+        state:
+          type: string
+          const: POSTED
+        entry_type:
+          type: string
+          enum:
+          - CREDIT_GIVEN
+          - REPAYMENT_RECEIVED
+        customer_id:
+          type: string
+        amount_paise:
+          type: integer
+          minimum: 1
+        outstanding_balance_paise:
+          type: integer
+          minimum: 0
+        posted_at:
+          type: string
+          format: date-time
+        simulated:
+          type: boolean
+    Fact:
+      type: object
+      required:
+      - fact_id
+      - metric
+      - value
+      - method
+      properties:
+        fact_id:
+          type: string
+        metric:
+          type: string
+        value:
+          type:
+          - integer
+          - number
+          - string
+          - 'null'
+        method:
+          type: string
+        source_entry_ids:
+          type: array
+          items:
+            type: string
+        source_event_ids:
+          type: array
+          items:
+            type: string
+    DailyInsights:
+      type: object
+      required:
+      - date
+      - timezone
+      - credit_given_paise
+      - repayments_received_paise
+      - receivables_net_change_paise
+      - facts
+      - simulated
+      - observation_coverage
+      - observed_sales_paise
+      properties:
+        date:
+          type: string
+          format: date
+        timezone:
+          type: string
+        credit_given_paise:
+          type: integer
+        repayments_received_paise:
+          type: integer
+        receivables_net_change_paise:
+          type: integer
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fact'
+        simulated:
+          type: boolean
+        observation_coverage:
+          type: string
+          enum:
+          - NO_DATA
+          - PARTIAL_UNVERIFIED
+          description: True recorded-event coverage for MVP; COMPLETE_VERIFIED is forbidden without an authoritative
+            data-feed contract.
+        observed_sales_paise:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          description: Sum of valid explicitly recorded nonvoid observed sales only; NULL when none. Never verified
+            total sales.
+      description: Recorded observations are PARTIAL, unverified activity observations, never complete/settled Paytm
+        sales. Missing data is unknown.
+    BriefingSlot:
+      type: object
+      required:
+      - type
+      - text
+      - fact_ids
+      properties:
+        type:
+          type: string
+          enum:
+          - SALES
+          - RECORD_READINESS
+          - CUSTOMER_INACTIVITY
+          - WHAT_IF
+        text:
+          type: string
+        fact_ids:
+          type: array
+          items:
+            type: string
+    Briefing:
+      type: object
+      required:
+      - briefing_id
+      - as_of
+      - language
+      - mode
+      - data_status
+      - slots
+      properties:
+        briefing_id:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        language:
+          type: string
+          enum:
+          - hi-IN
+          - te-IN
+          - en-IN
+        mode:
+          type: string
+          enum:
+          - TEMPLATE
+          - VALIDATED_MODEL
+        data_status:
+          type: string
+          enum:
+          - SYNTHETIC
+          - REAL_AUTHORIZED
+        slots:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/BriefingSlot'
+    Suggestion:
+      type: object
+      required:
+      - id
+      - customer_id
+      - reason_code
+      - state
+      - created_at
+      properties:
+        id:
+          type: string
+        customer_id:
+          type: string
+        reason_code:
+          type: string
+        state:
+          type: string
+          enum:
+          - PROPOSED
+          - DISMISSED
+          - DONE_MANUALLY
+        created_at:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - request_id
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            request_id:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+    Customer:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - display_name
+      - archived
+      - simulated
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        archived:
+          type: boolean
+        simulated:
+          type: boolean
+    CustomerCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - display_name
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Synthetic aliases only in demo
+    ObservationSaleCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - amount_paise
+      - observed_at
+      - source
+      - client_operation_id
+      properties:
+        amount_paise:
+          type: integer
+          minimum: 1
+          maximum: 100000000
+        observed_at:
+          type: string
+          format: date-time
+          description: UTC ISO8601 with Z in storage; merchant business-day timezone is Asia/Kolkata
+        source:
+          type: string
+          enum:
+          - MANUAL_OBSERVATION
+          - FIXTURE
+        note:
+          type: string
+          maxLength: 300
+        client_operation_id:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Unique merchant-scoped client request UUID; replay returns existing observation, divergent
+            payload conflicts.
+    ObservationVisitCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - customer_id
+      - observed_at
+      - source
+      - client_operation_id
+      properties:
+        customer_id:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum:
+          - MANUAL_OBSERVATION
+          - FIXTURE
+        client_operation_id:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Unique merchant-scoped client request UUID; replay returns existing observation, divergent
+            payload conflicts.
+    ObservationResult:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - simulated
+      - source
+      - observed_at
+      properties:
+        id:
+          type: string
+        simulated:
+          type: boolean
+          const: true
+        source:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+    ReadinessResult:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - reason_codes
+      - disclaimer
+      - simulated
+      properties:
+        status:
+          type: string
+          enum:
+          - NEEDS_MORE_RECORDS
+          - BASIC_RECORDS_AVAILABLE
+          - INSUFFICIENT_DATA
+        reason_codes:
+          type: array
+          items:
+            type: string
+        disclaimer:
+          type: string
+          const: Recordkeeping completeness only; not loan eligibility, underwriting or approval.
+        simulated:
+          type: boolean
+    ObservationVoid:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - observation_id
+      - kind
+      - reason
+      - voided_at
+      properties:
+        id:
+          type: string
+        observation_id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - SALE
+          - VISIT
+        reason:
+          type: string
+        voided_at:
+          type: string
+          format: date-time

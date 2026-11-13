@@ -1,0 +1,6 @@
+flowchart LR
+  Browser[Venue laptop browser] -->|localhost:5173| Vite[React app]
+  Vite -->|http localhost:8000| FastAPI[API server]
+  FastAPI -->|SQLite file| DB[(demo.db)]
+  FastAPI -->|HTTPS outbound if live| Sarvam[(Sarvam API)]
+  Seed[CLI seed/reset script] --> DB
