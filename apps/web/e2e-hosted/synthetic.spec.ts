@@ -45,38 +45,44 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
       expect(result.ok()).toBeTruthy();
       return result.json();
     };
-    const write = async (route: string, data: unknown, operation?: string, idempotency = false, status = 200) => {
-      const result = await request.post("/v1" + route, { data, maxRedirects: 0, headers: { ...headers,
-        ...(operation ? { [idempotency ? "Idempotency-Key" : "Client-Operation-Id"]: operation } : {}) } });
-      expect(result.status()).toBe(status);
-      return result.json();
-    };
+    await expect(page.getByRole("button", { name: "Record transaction" })).toBeEnabled();
+    await expect(other.getByRole("button", { name: "Record transaction" })).toBeEnabled();
     const merchant = await get("/merchants/me");
     expect((await (await mobile.request.get("/v1/merchants/me", { maxRedirects: 0 })).json()).id).not.toBe(merchant.id);
     const customer = (await get("/customers")).find((row: { display_name: string }) => row.display_name === "Ramesh");
     expect((await mobile.request.get("/v1/customers/" + customer.id + "/balance", { maxRedirects: 0 })).status()).toBe(404);
 
-    await page.getByRole("button", { name: "Record transaction" }).click();
-    await expect(page.getByRole("dialog", { name: "Record a transaction" })).toBeVisible();
-    await page.getByRole("combobox", { name: /customer/i }).selectOption(customer.id);
-    await page.getByRole("textbox", { name: "Exact amount in rupees" }).fill("500");
-    await page.getByRole("button", { name: /review draft/i }).click();
-    await expect(page.getByRole("dialog", { name: "Review your entry" })).toBeVisible();
-    await page.getByRole("button", { name: /confirm.*post|confirm.*entry/i }).click();
-    await expect.poll(async () => (await get("/customers/" + customer.id + "/balance")).outstanding_balance_paise).toBe(50000);
-
-    const financial = async (paise: number, entry_type: string) => {
-      const draft = await write("/ledger/drafts", { transcript: "", language: "en-IN",
-        parsed_override: { customer_id: customer.id, entry_type, amount_paise: paise, currency: "INR" } }, randomUUID());
-      const key = randomUUID();
-      const send = () => write("/ledger/drafts/" + draft.draft_id + "/confirm",
-        { confirm: true, expected_version: draft.version }, key, true);
-      const receipts = await Promise.all([send(), send()]);
-      expect(receipts[0]).toEqual(receipts[1]);
-      return receipts[0].outstanding_balance_paise;
+    const financial = async (rupees: number, type: string, balance: number) => {
+      await page.getByRole("button", { name: "Record transaction" }).click();
+      const capture = page.getByRole("dialog", { name: "Record a transaction" });
+      await capture.getByRole("combobox", { name: /customer/i }).selectOption(customer.id);
+      await capture.getByRole("combobox", { name: "Transaction type" }).selectOption(type);
+      await capture.getByRole("textbox", { name: "Exact amount in rupees" }).fill(String(rupees));
+      await capture.getByRole("button", { name: /review draft/i }).click();
+      const review = page.getByRole("dialog", { name: "Review your entry" });
+      await expect(review).toBeVisible();
+      const posted = page.waitForResponse(response => /\/v1\/ledger\/drafts\/[^/]+\/confirm$/.test(new URL(response.url()).pathname)
+        && response.request().method() === "POST");
+      await review.getByRole("button", { name: /confirm.*post|confirm.*entry/i }).click();
+      const confirmation = await posted;
+      expect(confirmation.status()).toBe(200);
+      const original = await confirmation.json();
+      expect(original.outstanding_balance_paise).toBe(balance);
+      const originalRequest = confirmation.request();
+      const key = await originalRequest.headerValue("idempotency-key");
+      expect(key).toBeTruthy();
+      const replay = () => request.post(new URL(originalRequest.url()).pathname, {
+        headers: { ...headers, "Idempotency-Key": key! }, data: originalRequest.postDataJSON(), maxRedirects: 0,
+      });
+      for (const retry of await Promise.all([replay(), replay()])) {
+        expect(retry.status()).toBe(200);
+        expect(await retry.json()).toEqual(original);
+      }
+      await expect(review).toHaveCount(0);
+      await expect.poll(async () => (await get("/customers/" + customer.id + "/balance")).outstanding_balance_paise).toBe(balance);
     };
-    expect(await financial(20000, "REPAYMENT_RECEIVED")).toBe(30000);
-    await page.reload();
+    await financial(500, "CREDIT_GIVEN", 50000);
+    await financial(200, "REPAYMENT_RECEIVED", 30000);
     await page.getByRole("button", { name: "Merchant Assistant" }).click();
     await page.getByLabel("Commitment customer").selectOption(customer.id);
     await page.getByRole("button", { name: "Review new commitment" }).click();
@@ -100,13 +106,13 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     await due.click();
     await page.getByRole("button", { name: "Confirm review and prepare draft" }).click();
     await expect(page.getByText("Draft not sent", { exact: true })).toBeVisible();
-    expect(await financial(10000, "REPAYMENT_RECEIVED")).toBe(20000);
+    await financial(100, "REPAYMENT_RECEIVED", 20000);
     const staleResponse = page.waitForResponse(response =>
       new URL(response.url()).pathname === "/v1/followups/drafts" && response.status() === 409);
     await page.getByRole("button", { name: "Check freshness and copy" }).click();
     expect((await (await staleResponse).json()).error.code).toBe("STALE_EVIDENCE");
     await expect(page.getByText("Draft not sent", { exact: true })).toHaveCount(0);
-    expect(await financial(50000, "CREDIT_GIVEN")).toBe(70000);
+    await financial(500, "CREDIT_GIVEN", 70000);
     expect((await get("/commitments/" + commitment.id)).due_status).toBe("REVIEW_REQUIRED");
     const wrongTenant = await mobile.request.patch("/v1/commitments/" + commitment.id, {
       maxRedirects: 0,

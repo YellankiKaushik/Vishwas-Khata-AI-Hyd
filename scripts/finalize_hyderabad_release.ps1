@@ -251,9 +251,9 @@ try {
     Write-Host "PR #2 merged at $stagingSha $($pr2.url)"
     $heads = Get-RemoteHeads
 
-    $existing = @((Invoke-Gh pr list --repo $repo --base main --head $integration --state all --json number | Out-String) | ConvertFrom-Json)
+    $existing = @(Invoke-Gh pr list --repo $repo --base main --head $integration --state all --json number --jq '.[].number')
     if ($existing.Count -gt 1) { throw 'Multiple integration PRs require inspection.' }
-    $pr = if ($existing.Count) { Get-Pr $existing[0].number } else { $null }
+    $pr = if ($existing.Count) { Get-Pr ([int]$existing[0]) } else { $null }
     if (!$pr -or $pr.state -ne 'MERGED') {
         Assert-Same $heads['main'] $mainBefore 'Integration base SHA'
         Assert-Same $heads[$staging] $stagingSha 'Merged staging ref'
@@ -291,6 +291,11 @@ try {
     Assert-Ancestor $candidate $mainSha
     Assert-Ancestor $venue $mainSha
     Assert-FinalRefs $mainSha $tagObject
+    $releases = @(Invoke-Gh api --paginate "repos/$repo/releases?per_page=100" --jq '.[].tag_name')
+    if ($tag -cnotin $releases) {
+        Invoke-Gh release create $tag --repo $repo --verify-tag --title 'Vishwas-Khata-AI Hyderabad venue release' --notes 'Frozen browser-tested Team Tic Tac Tech synthetic demo for the Hyderabad edition. Launch locally with scripts/demo_hyd.ps1. The SQLite ledger supports reviewed credit and repayment, a grounded deterministic assistant and unsent follow-up drafts.' | Out-Host
+    }
+    Invoke-Gh release view $tag --repo $repo --json tagName,url | Out-Host
     Write-Host "Integration PR #$($pr.number) merged at $mainSha $($pr.url)"
     Wait-Acceptance 'main' $mainSha
 

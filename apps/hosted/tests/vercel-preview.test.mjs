@@ -45,6 +45,8 @@ test('Vercel routes to the shared handler and ignores spoofed origin headers', a
     assert.equal(ready.status, 200);
     assert.equal((await ready.json()).status, 'ready');
   }
+  const proxy = new Request('http://' + host + '/v1/health/ready', { headers: { host, 'x-forwarded-proto': 'http' } });
+  assert.equal((await fetch(proxy)).status, 200);
   assert.equal(connections, 1);
   assert.equal((await fetch(request('/v1/demo/session', { method: 'POST',
     headers: { origin: 'https://other.invalid', 'x-forwarded-host': host },

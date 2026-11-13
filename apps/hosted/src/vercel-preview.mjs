@@ -25,8 +25,10 @@ export function createVercelPreview({ connect = connectPreview, env = process.en
     const url = new URL(request.url);
     if (url.href.length > 2048) return error('INVALID_INPUT', 422);
     const origin = previewOrigin(env);
-    if (!origin || request.headers.get('host') !== origin.host || url.origin !== origin.origin)
+    if (!origin || request.headers.get('host') !== origin.host || url.host !== origin.host)
       return error('ORIGIN_DENIED', 403);
+    // The configured origin supplies the HTTPS scheme behind the platform proxy.
+    url.protocol = 'https:';
     // Vercel may pass either the original URL or the internal rewrite URL.
     if (url.pathname === '/api/merchant') {
       const routes = url.searchParams.getAll(routeParam);
@@ -35,6 +37,7 @@ export function createVercelPreview({ connect = connectPreview, env = process.en
       url.pathname = '/v1/' + routes[0];
     }
     url.searchParams.delete(routeParam);
+    if (url.searchParams.size === 0) url.search = '';
     if (!url.pathname.startsWith('/v1/')) return error('ROUTE_NOT_FOUND', 404);
     if (request.method === 'GET' && url.pathname === '/v1/health/live')
       return reply({ status: 'alive' }, 200);
@@ -47,10 +50,8 @@ export function createVercelPreview({ connect = connectPreview, env = process.en
     }
     try {
       if (!handle) {
-        // Validate origin and session secret before allocating the module-scoped pool.
-        const config = { origin: origin.origin, secret: env.HOSTED_SESSION_SECRET, log };
         let database;
-        handle = createHandler({ ...config, transact: action => {
+        handle = createHandler({ origin: origin.origin, secret: env.HOSTED_SESSION_SECRET, log, transact: action => {
           database ??= connect(env.HOSTED_DATABASE_URL, env.HOSTED_DATABASE_CA);
           return database.transact(action);
         } });
