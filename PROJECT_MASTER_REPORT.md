@@ -1,20 +1,70 @@
-# Vishwas-Khata-AI — Project master report
+# Vishwas-Khata-AI Hyderabad project master report
 
-Updated 13 November 2026 (Asia/Kolkata). Synthetic data only. This is the primary current report; retained release/design documents describe earlier checkpoints.
+Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
-## 1. Executive project status
+## 1. Executive status
 
-The tested Hyderabad release is published, independently verified, and remains frozen on GitHub `main`. The original desktop project, both Repair 2 source folders, private audio/authorization receipts, historical bundles and venue data were preserved.
-
-| Release | Decision | Evidence boundary |
+| Decision | Status | Evidence |
 | --- | --- | --- |
-| HACKATHON_DEMO_STATUS | READY_WITH_LIMITATIONS | Fresh actual backend, browser, build and signed financial journey passed. Physical microphone/playback and organizer eligibility remain outside automated acceptance. |
-| PUBLIC_DEMO_STATUS | NOT_DEPLOYED | No interactive public HTTPS deployment exists. Public GitHub source is not a hosted application. |
-| REAL_AI_STATUS | MOCK_ONLY | Deterministic English and fake-provider transport tests; no new live inference or speech request. |
-| PAYTM_INTEGRATION_STATUS | APPROVAL_REQUIRED | Official documentation investigated; no authorized Paytm account integration or API implementation. |
-| PRODUCTION_STATUS | PROTOTYPE_ONLY | No real merchant authentication, managed production persistence or approved pilot. |
+| HACKATHON_DEMO_STATUS | READY_WITH_LIMITATIONS | The frozen Hyderabad demo keeps its previously verified venue release and backup. This pass independently reran 38 V3 reference tests. |
+| GITHUB_CONTRIBUTOR_ATTRIBUTION_STATUS | VERIFIED_ON_STAGING / DEFAULT_BRANCH_PENDING | GitHub resolves the staging author and committer to YellankiKaushik. The README and manifest are committed on a separate local branch. GitHub rejected remote branch creation. |
+| PUBLIC_DEMO_STATUS | NOT_DEPLOYED | Hosted code and acceptance scripts are prepared. Real PostgreSQL, production frontend and external HTTPS acceptance remain open. The release preflight exits 1. |
+| REAL_AI_STATUS | MOCK_ONLY | Deterministic English and existing bounded local adapter. No live calls or paid tests this pass. |
+| PAYTM_INTEGRATION_STATUS | STAGING_CONTRACT_TESTED / ACCOUNT_APPROVAL_REQUIRED | Two injected status-transport tests passed. No Paytm requests or payment processing. |
+| PRODUCTION_STATUS | PROTOTYPE_ONLY | Synthetic sessions and fictional records. No merchant onboarding, production processing, service SLO, or backup/restore witness. |
 
-Beyond-release changes are isolated on `feat/synthetic-staging-foundations`. Final staging regression status: **PASS** — 239 backend, 11 frontend, 28 Edge passed / 1 private-fixture skip, 38 reference and 11 embedded PostgreSQL tests. Production build, real HTTP financial smoke and dependency/source audits passed. No application test failed.
+## Attribution and release provenance
+
+| Ref | Verified revision | Evidence |
+| --- | --- | --- |
+| GitHub default branch main | 03d8192b989ae9d1da212f318ff172a919043830 | Root author and committer both identify as Vishwas-Khata-AI source release. GitHub returned no linked account ID. |
+| GitHub feat/synthetic-staging-foundations | 206e6cd02205987dadda1685134d2f2e14f46821 | Raw author and committer match locally. GitHub resolves both to YellankiKaushik. |
+| Local docs/hyderabad-maintainer | 1deae905623b828a82c3916cc7061c3908b44b21 | Configured Git author email matched the independently linked staging commit. README recognizes the maintainer, Tic Tac Tech, Hyderabad scope and earlier code lineage. The manifest retains the source SHA and adds the frozen base snapshot reference. All 167 hashes match in both trees. |
+| Local feat/hosted-synthetic-parity | Based on 206e6cd02205987dadda1685134d2f2e14f46821 | Backend milestone bc911b2806f9e115e78db887c6de0567f36a65f3, followed by frontend wiring and this report. |
+
+The original checkout remains on main. Development uses a separate checkout under .tmp/development because the original Git metadata is read-only in this session. Direct Git transport failed to resolve GitHub and the local GitHub CLI could not authenticate. The connected GitHub account identified as YellankiKaushik and read the repository, but branch creation and tree writes returned HTTP 403. Neither branch reached GitHub. There is no new PR, merge SHA, remote author resolution for the new commit, or observed Contributors graph refresh.
+
+## Hosted capability and V3 coverage
+
+| Capability | Status | Observed scope or gap |
+| --- | --- | --- |
+| Synthetic session and scoped customer identities | Implemented and tested | Secure HttpOnly, Strict cookies, two-hour expiry, explicit revocation, server-controlled fictional customers, restrictive RLS on the existing tenant policies, and private runtime role. Test handlers used distinct sessions in embedded PostgreSQL. Hosted customer mutation remains outside the fixed synthetic roster. |
+| Finance and receipts | Implemented and tested | Database-backed draft create/get/edit/cancel, exact integer paise, exact version, explicit confirmation, signed posting, atomic receipt, original replay, compensating reversal with reason, and no negative balances. The runtime role cannot call the raw posting function. |
+| Commitments and due list | Implemented and tested in part | The handler exposes create/list/get/update/cancel/handle/history. The new journey directly exercised creation, update, history and handling. Immutable reason events, IST due states, stale evidence and positive-credit review passed in the embedded engine. Direct hosted HTTP cancellation and boundary-clock acceptance remain to run. |
+| Assistant and reviewed drafts | Partially implemented | Hosted English supports a bounded set of deterministic due and balance questions. Unsupported questions receive guidance. Drafts require current version/evidence and explicit review. No delivery path exists. Local assistant continues to support the broader deterministic and optional bounded model path. |
+| HTTP protections and quotas | Implemented and tested in part | Origin checks, cookies, streamed JSON cap, integer token validation, distributed quota SQL and redacted errors have handler-level tests. Private HTTPS ingress, real multi-process quotas and ingress capacity remain unverified. |
+| Frontend parity | Implemented but unverified | Same-origin /v1 works with local FastAPI or the hosted Node service. Readiness selects hosted mode. Hosted saved writes are scoped to a session, and local-only briefing, observations, voice capture and custom customer creation are unavailable in hosted mode. A hosted Playwright configuration and two-browser test are prepared. |
+| PostgreSQL promotion and recovery | Implemented but unverified | Migration runner uses an advisory lock, transaction and checksums. Runtime role grants are separate. Acceptance script checks independent connections, RLS, direct-write denial, retry and rollback. Managed migration, concurrency, retention and provider restore remain open. |
+| Public HTTPS | Blocked by access | No reachable authorized database and no authenticated hosting account were available. Vercel config is still the original fail-closed staging preflight. A same-origin container with a private listener is prepared for an approved HTTPS host. |
+| Real AI, speech and Paytm accounts | Blocked by authorization | Existing deterministic and fake-provider paths remain available. Hindi and Telugu require individual authorized verification. Official Paytm credentials and product permissions are still needed. |
+| Production identity, payments and operations | Deferred conditional | Production merchant authentication, data handling, production payments, monitoring, encrypted backups and recovery objectives need a separate approval and acceptance process. |
+| Outbound customer delivery and unrestricted model actions | Not implemented | No send, arbitrary finance action, creditworthiness, or lending decision path exists. |
+
+The external Hyderabad V3 design, retained Hyderabad contracts, staging implementation and older reference package were reviewed. The original six unrun cases remain open: EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079. Embedded database checks provide related evidence for isolation and composite keys. They do not close those named cases.
+
+## Verification this pass
+
+- 17 hosted tests passed with locally cached PGlite 0.5.12. The lockfile still pins 0.5.16, which was unavailable offline. The run includes the 11 staging PostgreSQL tests, four hosted request-handler tests and two fake Paytm tests.
+- Hosted handler demonstrated 50,000 → 30,000 → 20,000 → 70,000 paise, original receipt replay, stale draft rejection, renewed review, and reversal back to 20,000 paise. It also checked separate sessions, revoked/expired cookies, origin rejection, strict amounts, request quota and raw-post denial.
+- All 10 existing injected-provider staging tests passed. No provider traffic was made.
+- All 38 V3 reference tests passed. The static design audit passed using Python UTF-8 mode. The frozen manifest, 34 reference hashes, eight historical migrations and publication source scan passed.
+- The production pg dependency installed from cache and loaded. Node syntax checks and six changed TypeScript source parse checks passed. The locked frontend npm install, full typecheck/build, Vitest, Playwright, and dependency audits did not complete because pinned dependencies or the registry were unavailable. The backend regression did not collect because FastAPI is absent from this environment. A loopback TCP probe was denied with EACCES.
+- The real PostgreSQL test exited with missing database configuration. The release preflight remains closed. No HTTPS URL, deploy revision, browser verification, production audit or provider restore claim is supported.
+
+## Promotion and recovery procedure
+
+1. Authenticate GitHub CLI as YellankiKaushik in a network-enabled terminal. Verify the two origin SHAs with git ls-remote. Push docs/hyderabad-maintainer from this checkout, verify the commit API author, review the documentation-only PR, merge with an ancestry-preserving merge, and verify the resulting main SHA. GitHub contributor statistics may refresh later. Push the reviewed feature branch separately and open its PR against feat/synthetic-staging-foundations.
+2. Identify an existing approved free HTTPS runtime and dedicated synthetic PostgreSQL database. Provision the schema owner as a non-superuser without BYPASSRLS and a separate hyd_runtime LOGIN without role memberships. Limit the database to server access. Set HOSTED_MIGRATION_DATABASE_URL only in the migration runner. Configure HOSTED_DATABASE_URL, HOSTED_DATABASE_CA, HOSTED_SESSION_SECRET and HOSTED_PUBLIC_ORIGIN in private environment settings. Keep migration credentials out of the runtime.
+3. Install locked dependencies and rerun the local Python, frontend, hosted, reference, browser and advisory checks. Apply npm run migrate from apps/hosted and run npm run test:postgres on the approved PostgreSQL instance. Test repeat migration and restored state on a disposable database. The migration runner rejects an existing untracked schema; a preexisting database requires reviewed provenance.
+4. Build the container from the repository root with docker build -f apps/hosted/deployment/Dockerfile . and use an authenticated private acceptance environment with HTTPS ingress preserving the exact Host. The default container entry point enforces the public release preflight. Record full browser, concurrency, recovery and redacted logging evidence before public promotion.
+5. If application rollback is required, use the prior compatible application image with the same forward-only schema, or take the endpoint offline if compatibility is unverified. Preserve the database and journal. Keep backups encrypted, restore to a separate instance and verify migrations, journal totals and receipt replay before switching connections. Apply any data correction as an explicitly reviewed compensating posting.
+6. Obtain separate finite provider/model approvals before any live AI or speech request. Use synthetic English, Hindi and Telugu samples separately for rupees, ambiguous names, explicit customer identity, cancellation, device errors, timeout and typed fallback. For Paytm, obtain approved staging MID and credentials, the assigned host and applicable partner scope directly from Paytm before any staging traffic. The fake transport does not create, settle, or reconcile real payments.
+
+Current official Paytm references: [Transaction Status API](https://www.paytmpayments.com/docs/api/v3/transaction-status-api/), [callback and webhooks](https://www.paytmpayments.com/docs/callback-and-webhook), [Settlement API](https://www.paytmpayments.com/docs/api/settlement-api), and [Mini App onboarding](https://business.paytm.com/docs/miniapps/integration-steps). Gateway access, production-only settlement, Mini App onboarding, Paytm for Business placement and production payment authorization are separate. The injected contract validates signed status against server-owned order identity and amount. It returns separate review evidence without a journal write.
+
+## Earlier release record and full requirement crosswalk
+
+The sections that follow preserve the pre-hosted implementation evidence. References to hosted groundwork and earlier test counts describe that checkpoint.
 
 ## 2. Original vision and Hyderabad V3 scope
 

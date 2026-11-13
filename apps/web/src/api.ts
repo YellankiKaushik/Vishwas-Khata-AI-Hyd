@@ -133,6 +133,10 @@ export class ApiError extends Error {
     super(message);
   }
 }
+// The local FastAPI server and hosted service both expose a same-origin API.
+export const operationStorageKey = (key: string, hosted: boolean, merchantId?: string) =>
+  hosted ? `${key}.hosted.${merchantId || "unbound"}` : key;
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {

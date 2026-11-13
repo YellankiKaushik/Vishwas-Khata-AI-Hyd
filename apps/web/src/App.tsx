@@ -37,6 +37,7 @@ import {
   type Entry,
   type Receipt,
   type Pending,
+  operationStorageKey,
   type Insights,
   type Briefing,
 } from "./api";
@@ -84,7 +85,10 @@ export default function App() {
     voice_provider: string;
     synthetic_clock: string | null;
     hyd_enabled?: boolean;
+    hosted?: boolean;
   } | null>(null);
+  const hosted = ready?.hosted === true;
+  const receiptKey = operationStorageKey("vishwas.lastReceipt", hosted, merchant?.id);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -134,7 +138,7 @@ export default function App() {
     entry_id: string;
     key: string;
     reason: string;
-  }>("vishwas.reversal.v1");
+  }>(operationStorageKey("vishwas.reversal.v1", hosted, merchant?.id));
 
   async function submitObservation() {
     await action(async () => {
@@ -252,7 +256,7 @@ export default function App() {
     void load();
   }, []);
   useEffect(() => {
-    if (!merchant) return;
+    if (!merchant || hosted) return;
     let stopped = false;
     setInsights(null);
     setBriefing(null);
@@ -275,13 +279,14 @@ export default function App() {
     return () => {
       stopped = true;
     };
-  }, [merchant?.id, reportDate, revision]);
+  }, [merchant?.id, reportDate, revision, hosted]);
   async function action(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
     try {
       await fn();
     } catch (e) {
+      if (hosted && e instanceof ApiError && e.status === 401) await load();
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -312,7 +317,7 @@ export default function App() {
   async function retryLast() {
     await action(async () => {
       const saved = JSON.parse(
-        localStorage.getItem("vishwas.lastReceipt") || "null",
+        localStorage.getItem(receiptKey) || "null",
       ) as { operation: Pending; result: Receipt } | null;
       if (!saved)
         throw new Error("Complete one confirmation in this browser first.");
@@ -504,7 +509,7 @@ export default function App() {
         </button>
         <div className="workspace-label">MERCHANT WORKSPACE</div>
         <nav aria-label="Main navigation">
-          {nav.filter((n) => n.id !== "assistant" || ready?.hyd_enabled).map((n) => (
+          {nav.filter((n) => (n.id !== "assistant" || ready?.hyd_enabled) && (!hosted || n.id !== "briefing")).map((n) => (
             <button
               key={n.id}
               className={view === n.id ? "active" : ""}
@@ -531,7 +536,7 @@ export default function App() {
             <span>K</span>
             <div>
               <strong>{merchant?.display_name || "Kirana Demo Shop"}</strong>
-              <small>Local synthetic workspace</small>
+              <small>{hosted ? "Hosted synthetic workspace" : "Local synthetic workspace"}</small>
             </div>
           </div>
         </div>
@@ -553,7 +558,7 @@ export default function App() {
           </div>
           <div className="top-status">
             <span className="status-dot" />
-            Local demo <span className="synthetic-badge">SYNTHETIC DATA</span>
+            {hosted ? "Hosted demo" : "Local demo"} <span className="synthetic-badge">SYNTHETIC DATA</span>
             <div className="avatar">K</div>
           </div>
         </header>
@@ -614,7 +619,7 @@ export default function App() {
             </div>
           )}
           {message && <Success text={message} />}
-          {pendingObservation && (
+          {!hosted && pendingObservation && (
             <div className="notice" role="status">
               An observation response is unresolved. Its original data and
               operation ID are saved.
@@ -799,11 +804,11 @@ export default function App() {
                         <Mic size={24} />
                       </div>
                       <div>
-                        <span className="eyebrow">SPEAK. REVIEW. CONFIRM.</span>
+                        <span className="eyebrow">{hosted ? "REVIEW. CONFIRM." : "SPEAK. REVIEW. CONFIRM."}</span>
                         <h2>A khata that keeps up with you.</h2>
                         <p>
-                          Use exact fields or a simple sentence. Check every
-                          detail before it becomes a record.
+                          {hosted ? "Use exact fields and review each detail before posting." :
+                            "Use exact fields or a simple sentence. Check every detail before it becomes a record."}
                         </p>
                         <button
                           className="text-button"
@@ -830,6 +835,7 @@ export default function App() {
                     </div>
                     <button
                       className="secondary"
+                      hidden={hosted}
                       onClick={() => {
                         setError("");
                         setCustomerModal(true);
@@ -1141,6 +1147,7 @@ export default function App() {
         <Capture
           key={merchant?.id || "no-shop"}
           scopeId={merchant?.id || "no-shop"}
+          hosted={hosted}
           customers={customers}
           onClose={() => setCapture(false)}
           onPosted={(r) => void posted(r)}
