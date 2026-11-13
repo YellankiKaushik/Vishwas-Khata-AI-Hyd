@@ -5,9 +5,15 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "start": "node src/server.mjs",
+    "test:postgres": "node --test acceptance/postgres.mjs",
+    "migrate": "node scripts/migrate.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
   }
 }
