@@ -13,7 +13,7 @@ function Invoke-Check {
 
 Invoke-Check node @('--version')
 Invoke-Check npm.cmd @('--version')
-Invoke-Check powershell.exe @('-NoProfile','-File',(Join-Path $root 'scripts/setup.ps1'),'-DependenciesOnly')
+Invoke-Check powershell.exe @('-NoProfile','-File',(Join-Path $root 'scripts/setup.ps1'),'-DependenciesOnly','-Hosted')
 $python = Join-Path $root '.venv/Scripts/python.exe'
 Invoke-Check $python @('--version')
 Invoke-Check $python @('-m','pip','--version')

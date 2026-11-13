@@ -1,6 +1,9 @@
 # Run from the existing development checkout in an authenticated PowerShell.
 [CmdletBinding()]
-param([ValidateRange(5, 120)][int]$WaitMinutes = 50)
+param(
+    [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedHead,
+    [ValidateRange(5, 120)][int]$WaitMinutes = 50
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -194,6 +197,7 @@ try {
     Assert-Same (Invoke-Git branch --show-current) $hosted 'Local branch'
     if (Invoke-Git status --porcelain) { throw 'The development checkout must be clean.' }
     $candidate = Invoke-Git rev-parse HEAD
+    Assert-Same $candidate $ExpectedHead 'Local release candidate SHA'
     Assert-Ancestor $hostedBefore $candidate
     Assert-Ancestor $stagingBefore $candidate
     Assert-Same (Invoke-Git cat-file -t "refs/tags/$tag") 'tag' 'Venue tag object type'

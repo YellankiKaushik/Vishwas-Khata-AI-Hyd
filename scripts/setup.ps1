@@ -1,4 +1,4 @@
-param([switch]$DependenciesOnly)
+param([switch]$DependenciesOnly, [switch]$Hosted)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 New-Item -ItemType Directory -Force .tmp | Out-Null
@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Audited pip bootstrap failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Python dependency installation failed' }
 npm --prefix apps/web ci --cache .tmp/npm-cache
 if ($LASTEXITCODE -ne 0) { throw 'Web dependency installation failed' }
-if (Test-Path 'apps/hosted/package-lock.json') {
+if ($Hosted) {
     npm --prefix apps/hosted ci --cache .tmp/npm-cache
     if ($LASTEXITCODE -ne 0) { throw 'Hosted test dependency installation failed' }
 }
