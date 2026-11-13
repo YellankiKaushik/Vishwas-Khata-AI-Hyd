@@ -1,0 +1,210 @@
+name: Hosted synthetic acceptance
+on:
+  push:
+    branches: [main, feat/synthetic-staging-foundations, feat/hosted-synthetic-parity, release/hyderabad-integration]
+  pull_request:
+    branches: [main, feat/synthetic-staging-foundations]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+jobs:
+  backend:
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
+      - name: Install locked Python dependencies
+        run: |
+          mkdir -p .tmp
+          python -m venv .venv
+          .venv/bin/python -m pip install pip==26.3
+          .venv/bin/python -m pip install -r requirements-lock.txt
+          .venv/bin/python --version
+          .venv/bin/python -m pip --version
+          .venv/bin/python -m pip show fastapi pytest pip_audit
+      - name: Verify backend and reference contracts
+        run: |
+          .venv/bin/python -X utf8 -m pytest -q tests
+          .venv/bin/python -X utf8 -m pytest -q Project_Vishwas_Khata_V3/tests
+          .venv/bin/python -X utf8 Project_Vishwas_Khata_V3/verification/verify_v3.py
+          git restore -- Project_Vishwas_Khata_V3/verification/V3_STATIC_AUDIT_RESULTS.txt
+          .venv/bin/python -X utf8 scripts/verify_release.py
+      - name: Audit Python lock
+        if: "!cancelled()"
+        run: |
+          .venv/bin/python -m pip check
+          .venv/bin/python -m pip_audit -r requirements-lock.txt
+
+  hosted-unit:
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: apps/hosted/package-lock.json
+      - name: Install locked hosted dependencies
+        run: |
+          node --version
+          npm --version
+          npm --prefix apps/hosted ci
+          node -e "const p=require('./apps/hosted/node_modules/@electric-sql/pglite/package.json').version; console.log(p); if (p !== '0.5.16') process.exit(1)"
+          npm --prefix apps/hosted ls --depth=0
+      - name: Verify hosted unit tests
+        run: npm --prefix apps/hosted test
+      - name: Verify public startup remains gated
+        run: |
+          if npm --prefix apps/hosted run preflight; then
+            echo '::error::Public preflight unexpectedly passed without deployment settings'
+            exit 1
+          fi
+          if result=$(npm --prefix apps/hosted start 2>&1); then
+            echo '::error::The hosted server unexpectedly started without public release approval'
+            exit 1
+          fi
+          grep -Fq HOSTED_PUBLIC_RELEASE_GATE_CLOSED <<< "$result"
+      - name: Audit hosted npm lock
+        if: "!cancelled()"
+        run: |
+          npm --prefix apps/hosted audit
+          npm audit --omit=dev
+
+  local-browser:
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-lock.txt
+      - name: Install locked Python dependencies
+        run: |
+          mkdir -p .tmp
+          python -m venv .venv
+          .venv/bin/python -m pip install pip==26.3
+          .venv/bin/python -m pip install -r requirements-lock.txt
+          .venv/bin/python --version
+          .venv/bin/python -m pip --version
+          .venv/bin/python -m pip show fastapi pytest pip_audit
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install locked frontend dependencies
+        run: |
+          npm --prefix apps/web ci
+          npm --prefix apps/web ls --depth=0
+      - name: Verify frontend unit tests
+        run: npm --prefix apps/web test
+      - name: Install locked Playwright Chromium and Linux dependencies
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps chromium
+          node --input-type=module -e 'import {chromium} from "playwright"; const b=await chromium.launch({chromiumSandbox:false}); try { console.log("Playwright Chromium", b.version(), "on GitHub-hosted Ubuntu; browser sandbox disabled for CI"); } finally { await b.close(); }'
+      - name: Build production frontend
+        run: npm --prefix apps/web run build
+      - name: Verify original Hyderabad demo on loopback
+        run: .venv/bin/python -X utf8 scripts/smoke_local_http.py
+      - name: Repeat the voice confirmation regression
+        working-directory: apps/web
+        run: VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test e2e/voice.spec.ts --grep "recorded real STT response replay" --repeat-each 3 --trace off
+      - name: Verify local Chromium flow
+        working-directory: apps/web
+        run: VISHWAS_TEST_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python" npm exec -- playwright test --trace off
+      - name: Audit frontend npm lock
+        if: "!cancelled()"
+        run: npm --prefix apps/web audit
+      - name: Upload synthetic failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-browser-failure-screenshots
+          path: test-results/browser/**/test-failed-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  hosted-browser:
+    if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: |
+            apps/hosted/package-lock.json
+            apps/web/package-lock.json
+      - name: Install locked hosted dependencies
+        run: npm --prefix apps/hosted ci --omit=dev
+      - name: Install locked frontend dependencies
+        run: |
+          npm --prefix apps/web ci
+          npm --prefix apps/web ls --depth=0
+      - name: Install locked Playwright Chromium and Linux dependencies
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps chromium
+          node --input-type=module -e 'import {chromium} from "playwright"; const b=await chromium.launch({chromiumSandbox:false}); try { console.log("Playwright Chromium", b.version(), "on GitHub-hosted Ubuntu; browser sandbox disabled for CI"); } finally { await b.close(); }'
+      - name: Build production frontend
+        run: npm --prefix apps/web run build
+      - name: Verify real PostgreSQL and hosted HTTPS Chromium flow
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+          docker info --format '{{.OSType}} {{.ServerVersion}}'
+          pwsh -NoProfile -File scripts/test_hosted_postgres.ps1 -Browser -CiBrowser
+      - name: Upload synthetic failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-browser-failure-screenshots
+          path: apps/web/test-results/**/test-failed-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  acceptance:
+    if: always() && github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd'
+    needs: [backend, hosted-unit, local-browser, hosted-browser]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all acceptance jobs to succeed
+        env:
+          BACKEND: ${{ needs.backend.result }}
+          HOSTED_UNIT: ${{ needs.hosted-unit.result }}
+          LOCAL_BROWSER: ${{ needs.local-browser.result }}
+          HOSTED_BROWSER: ${{ needs.hosted-browser.result }}
+        run: |
+          printf 'Backend=%s HostedUnit=%s LocalBrowser=%s HostedBrowser=%s\n' "$BACKEND" "$HOSTED_UNIT" "$LOCAL_BROWSER" "$HOSTED_BROWSER"
+          test "$BACKEND/$HOSTED_UNIT/$LOCAL_BROWSER/$HOSTED_BROWSER" = success/success/success/success

@@ -26,8 +26,12 @@ npm --prefix apps/web run build
 if ($LASTEXITCODE -ne 0) { throw 'Web production build failed' }
 npm --prefix apps/web run test:e2e
 if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
-& $taskPython -X utf8 scripts/verify_finale.py --app-only
-if ($LASTEXITCODE -ne 0) { throw 'Application-only source/security/deferred-artifact verification failed' }
+& $taskPython -X utf8 scripts/verify_release.py
+if ($LASTEXITCODE -ne 0) { throw 'Frozen release provenance/source security verification failed' }
+if (Test-Path 'apps/hosted/package.json') {
+    npm --prefix apps/hosted test
+    if ($LASTEXITCODE -ne 0) { throw 'Hosted PostgreSQL groundwork tests failed' }
+}
 if ($Audit) {
     & $taskPython -m pip_audit --progress-spinner off
     if ($LASTEXITCODE -ne 0) { throw 'Python dependency audit failed' }
