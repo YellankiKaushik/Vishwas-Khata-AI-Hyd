@@ -13,5 +13,6 @@ export default defineConfig({
     channel: "msedge",
     launchOptions: { chromiumSandbox: true },
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
 });

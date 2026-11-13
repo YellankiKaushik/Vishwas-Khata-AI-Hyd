@@ -153,13 +153,24 @@ test('session expiry, revocation, origin and private-role posting restriction', 
     await tx.exec('SET LOCAL ROLE hyd_runtime');
     await tx.query("SELECT set_config('hyd_demo.tenant_id',$1,true)", [a.tenant]);
     assert.deepEqual((await tx.query('SELECT * FROM hyd_demo.customers')).rows, []);
-    await assert.rejects(tx.query("SELECT hyd_demo.post_entry($1,$2,'CREDIT_GIVEN',100,true)", [a.customer, randomUUID()]), /permission denied/);
   });
   await call('/demo/session', { method: 'DELETE', cookie: a.cookie });
   await call('/merchants/me', { cookie: a.cookie, expect: 401 });
   const b = await session();
   await pg.query("UPDATE hyd_demo.demo_sessions SET expires_at=clock_timestamp() - interval '1 second' WHERE tenant_id=$1", [b.tenant]);
   await call('/merchants/me', { cookie: b.cookie, expect: 401 });
+});
+
+test('denied raw posting rolls back and leaves the runtime connection usable', async () => {
+  const { cookie, customer } = await session();
+  // Let the database error escape the transaction callback so PGlite rolls back.
+  await assert.rejects(pg.transaction(async tx => {
+    await tx.exec('SET LOCAL ROLE hyd_runtime');
+    return tx.query("SELECT hyd_demo.post_entry($1,$2,'CREDIT_GIVEN',100,true)", [customer, randomUUID()]);
+  }), { code: '42501', message: /permission denied for function post_entry/ });
+
+  const result = await call('/ledger/entries', { cookie });
+  assert.deepEqual(result.data.items, []);
 });
 
 test('rate limits persist across rejected actions', async () => {

@@ -2,6 +2,40 @@
 
 Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
+## Latest executive status
+
+GitHub main is 482e80a98a770b6e09786d52d754c4686efc6c37. PR #1 is merged with maintainer attribution verified. The stable venue demo and its SQLite migrations are preserved. [Draft PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) targets staging. Its last observed published head is b1e0670cc65a8b082ec186fffba2393977b6bbef. The correction in this report's commit is a fast-forward child of that head.
+
+### Observed CI results
+
+[Run 43404020255](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43404020255), job 131813724593, completed with failures. The complete job log was inspected.
+
+| Check | Result |
+| --- | --- |
+| Exact installs | Python 3.12.16, pip 26.3, FastAPI 0.162.0, pytest 9.2.0, pip_audit 2.10.1, Node 24.16.0, npm 11.13.0, PGlite 0.5.16 and pg 8.23.1. Both npm lockfiles installed, including Playwright 1.64.1, TypeScript 5.8.3, Vite 8.3.5 and Vitest 5.0.5. |
+| Backend and references | 239 backend tests and 38 V3 reference tests passed. The V3 verifier and source checks passed. |
+| Hosted unit | 17 passed and 1 failed under PGlite 0.5.16. The permission test handled an expected 42501 inside the callback, so PGlite attempted COMMIT against the aborted transaction and surfaced 25P02. |
+| Frontend | 11 Vitest tests passed. TypeScript and the production Vite build passed. |
+| Local Edge 156.0.4314.58 | 10 passed and 19 failed. All 19 reported failures hit the sandbox helper configuration error on startup. The prior Windows venue witness is historical, with 28 passed and 1 private-audio skip. |
+| Real PostgreSQL 17 | TLS migrations, repeat checks, roles, independent connections, isolation, concurrency, rollback and restored-database acceptance passed. |
+| Hosted HTTPS API | Loopback HTTPS assets, readiness, origin, bounds, sessions, concurrent receipt replay, financial journey, stale draft rejection, quota, and expiry/revocation passed against real PostgreSQL. |
+| Hosted Edge | 1 failure before the test body, caused by the same sandbox helper configuration. Hosted browser acceptance is pending. |
+| Advisory checks | Python reported no known vulnerabilities. Both npm audits reported zero vulnerabilities. |
+
+### Corrections and next acceptance
+
+The negative posting permission test now asserts rejection of the entire transaction so the SQL error reaches PGlite's rollback handler. A separate regression checks SQLSTATE 42501 and verifies the hosted session can read its empty journal afterward. The runtime role, grants and RLS are unchanged. Local supplemental verification passed all 19 hosted tests with cached PGlite 0.5.12. Acceptance on 0.5.16 awaits the next CI run.
+
+Both Edge jobs use the same Ubuntu runner-only setup. It obtains Edge through signed Microsoft APT metadata, verifies key fingerprints and the installed binary and helper against the package payload, checks root ownership and non-writable path components, then sets mode 4755 on the package-owned helper. Browser sandbox and HTTPS verification remain enabled. The workflow separates backend, hosted unit, local Edge and PostgreSQL/hosted Edge, with a final gate requiring all four jobs. Failure screenshots may be uploaded. CI trace recording is off because traces can include synthetic auth cookies. GitHub job logs remain the diagnostic source.
+
+The hosted container has a readiness health check using its configured host. Public promotion remains closed. A Render Docker web service is a candidate for an approved free Node runtime. Render's free PostgreSQL expires after 30 days, and Neon Free does not establish IP-restricted private access. A dedicated synthetic PostgreSQL project with separate runtime and migration credentials and an approved connection policy must be verified before deployment. The Vercel preflight remains in place. There is no public HTTPS deployment or URL.
+
+V3 cases EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079 remain open. Real AI and live speech remain approval-gated. Official Paytm account integration remains separate from the passing fake-transport tests. Production remains prototype-only.
+
+From the approved checkout in an authenticated ordinary PowerShell, publish the fast-forward correction with **git -C .tmp/development push origin HEAD:refs/heads/feat/hosted-synthetic-parity**. This triggers the next workflow on the existing draft. After CI passes, the only deployment access needed is an approved free Node-capable HTTPS service and a dedicated synthetic PostgreSQL project. Keep secrets in the respective private environment settings.
+
+## Earlier release evidence
+
 ## Latest release decision
 
 **Public demo status: NOT_DEPLOYED.** The frozen SQLite venue release is preserved. Hosted PR #2 remains an open draft against feat/synthetic-staging-foundations. Do not promote it until locked regressions, real PostgreSQL and hosted browser acceptance pass. The hosted public preflight still exits 1.

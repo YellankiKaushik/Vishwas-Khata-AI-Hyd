@@ -138,7 +138,7 @@ CREATE DATABASE hyd_restored OWNER hyd_owner;
             Invoke-Checked certutil @('-A','-d',"sql:$nss",'-n',$container,'-t','C,,','-i',$ca)
             try {
                 Push-Location (Join-Path $root 'apps/web')
-                try { Invoke-Checked $npm @('exec','--','playwright','test','-c','playwright.hosted.config.ts') }
+                try { Invoke-Checked $npm @('exec','--','playwright','test','-c','playwright.hosted.config.ts','--trace','off') }
                 finally { Pop-Location }
             } finally {
                 Invoke-Checked certutil @('-D','-d',"sql:$nss",'-n',$container)
