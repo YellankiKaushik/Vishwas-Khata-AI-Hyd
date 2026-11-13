@@ -61,16 +61,26 @@ try {
     }
     if (!$ready) { throw 'Disposable PostgreSQL did not become ready' }
 
+    $provision = Get-Content -LiteralPath 'apps/hosted/deployment/supabase-provision.sql' -Raw
+    for ($attempt = 0; $attempt -lt 2; $attempt++) {
+        $provision | docker exec -i $container psql -Xq -v ON_ERROR_STOP=1 -U postgres -d postgres
+        if ($LASTEXITCODE -ne 0) { throw 'Supabase SQL provisioning failed in disposable PostgreSQL' }
+    }
     @"
-CREATE ROLE hyd_owner LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD '$ownerPassword';
-CREATE ROLE hyd_runtime LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD '$runtimePassword';
+ALTER ROLE hyd_owner PASSWORD '$ownerPassword';
+ALTER ROLE hyd_runtime PASSWORD '$runtimePassword';
 CREATE DATABASE hyd_acceptance OWNER hyd_owner;
 CREATE DATABASE hyd_restored OWNER hyd_owner;
 "@ | docker exec -i $container psql -Xq -v ON_ERROR_STOP=1 -U postgres
     if ($LASTEXITCODE -ne 0) { throw 'Disposable role provisioning failed' }
     $env:HOSTED_DATABASE_CA = Get-Content -LiteralPath $ca -Raw
-    $env:HOSTED_DATABASE_URL = "postgresql://hyd_runtime:${runtimePassword}@127.0.0.1:${port}/hyd_acceptance"
-    $env:HOSTED_MIGRATION_DATABASE_URL = "postgresql://hyd_owner:${ownerPassword}@127.0.0.1:${port}/hyd_acceptance"
+    $env:HOSTED_DATABASE_URL = "postgresql://hyd_runtime:${runtimePassword}@127.0.0.1:${port}/postgres"
+    $env:HOSTED_MIGRATION_DATABASE_URL = "postgresql://hyd_owner:${ownerPassword}@127.0.0.1:${port}/postgres"
+    Invoke-Checked $npm @('--prefix','apps/hosted','run','migrate')
+    Invoke-Checked $npm @('--prefix','apps/hosted','run','migrate')
+    Invoke-Checked $npm @('--prefix','apps/hosted','run','test:postgres')
+    $env:HOSTED_DATABASE_URL = $env:HOSTED_DATABASE_URL.Replace('/postgres','/hyd_acceptance')
+    $env:HOSTED_MIGRATION_DATABASE_URL = $env:HOSTED_MIGRATION_DATABASE_URL.Replace('/postgres','/hyd_acceptance')
     Invoke-Checked $npm @('--prefix','apps/hosted','run','migrate')
     Invoke-Checked $npm @('--prefix','apps/hosted','run','migrate')
     $expectedChecksums = @(Get-ChildItem -LiteralPath 'apps/hosted/migrations' -Filter '*.sql' -File |

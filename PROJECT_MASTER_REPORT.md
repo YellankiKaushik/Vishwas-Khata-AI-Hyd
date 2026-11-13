@@ -1,6 +1,18 @@
 # Vishwas-Khata-AI Hyderabad project master report
 
-## Current release status - 13 November 2026 (IST)
+## Supabase integration status - 14 November 2026 (IST)
+
+The Supabase candidate is on local branch `release/supabase-pooler`, based on verified GitHub `main` at `ee22f382fd5129b7087f0d857f2ab72bbf4f510c`. The managed GitHub CLI returned HTTP 401 and the connector denied repository writes. The Supabase PR, candidate CI, merge and post-merge verification are pending. GitHub currently has only `main`. The existing venue tag still resolves to its frozen release.
+
+- The [provisioning SQL](apps/hosted/deployment/supabase-provision.sql) creates separate schema-scoped migration and runtime roles. Use the SQL Editor for project `xzsccwmljyckbmjcfang` and set passwords separately. Runtime connects through shared transaction pooling with verified TLS and a pool cap of two. Migration uses the separate session or direct connection. The original four migration files and their checksums are preserved.
+- The locked local suite passed 24 hosted tests on PGlite 0.5.16, including provisioning twice, migration replay and checksum drift rejection. All 239 backend and 38 V3 tests passed in the supplemental Windows run. The V3 verifier, 11 frontend tests, TypeScript/Vite build and npm audits passed.
+- Disposable native PostgreSQL 17.11 accepted the provisioning SQL twice and ran all four migrations and their checksum replay through verified TLS. One PostgreSQL acceptance test passed for effective roles, two concurrent connections, tenant isolation, receipt replay, rollback and stale financial evidence. This used direct loopback connections. The Docker recovery/HTTPS job and real Supavisor transaction transport still require verification.
+- Windows Chromium ran ten voice tests successfully. Nineteen other tests hit Chromium process launch errors in the managed session, and the runner did not finalize. The required Chromium result must come from candidate CI.
+- The Vercel adapter tests and function dependency trace passed. The existing production hostname is not a verified protected Preview. No authenticated Supabase or Vercel access was available. Real Supabase endpoint TLS, transaction pooling and the deployed merchant journey still require a witness. The public gate remains closed.
+- Use the [deployment handoff](apps/hosted/deployment/README.md) for private credentials, migrations, the protected Git-backed Preview and HTTPS verification. `scripts/finalize_supabase_release.ps1` publishes the exact local candidate, waits for acceptance before merge, verifies main CI and removes only the merged candidate branch.
+
+
+## Historical status before the venue merge - 13 November 2026 (IST)
 
 | Item | Verified state |
 | --- | --- |
