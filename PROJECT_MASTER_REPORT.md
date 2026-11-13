@@ -1,8 +1,31 @@
 # Vishwas-Khata-AI Hyderabad project master report
 
-Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
+Updated 13 November 2026 (IST). Current release evidence is recorded first. Prior runs and the V3 crosswalk follow as historical records.
 
-## Current executive status
+## Current release status
+
+| Item | Verified state |
+| --- | --- |
+| GitHub main | `482e80a98a770b6e09786d52d754c4686efc6c37`, with the maintainer attribution from merged [PR #1](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/1). |
+| Stable venue release | Local annotated tag `hyderabad-venue-2026-11-13` points to the browser-tested `03d8192b989ae9d1da212f318ff172a919043830`. Remote publication is pending. The launcher is `scripts/demo_hyd.ps1`. |
+| Latest published CI | [Run 43414477563](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43414477563), hosted head `8173d4b7b65e3d7baf922ef42957349429678129`. Backend and hosted-unit passed. Both Edge jobs and the acceptance gate failed because the installed package path included root-owned `/opt/microsoft` with mode 0777. |
+| Backend and hosted unit counts | The latest published run passed 239 backend, 38 V3 reference and 19 hosted tests with locked PGlite 0.5.16. The Python and hosted npm audits passed. |
+| Frontend and browsers | [Run 43404020255](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43404020255) passed 11 frontend unit tests and the TypeScript/Vite build. The frozen Windows venue run passed 28 browser tests with one private-audio skip. The latest published run stopped before either Edge suite. |
+| Real PostgreSQL and HTTPS | Run 43404020255 passed PostgreSQL 17 migrations, independent connections, tenant isolation, concurrency, rollback, backup and restore, and the loopback HTTPS API journey through ₹500, ₹300, ₹200 and ₹700 balances with stale draft rejection. The hosted React/Edge journey still needs a passing witness. |
+| Hosted PR | [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) remains an open draft against `feat/synthetic-staging-foundations`. Published staging is `206e6cd02205987dadda1685134d2f2e14f46821`. |
+| Integration and cleanup | The staging-to-main integration PR is pending. Zero remote branches deleted in this pass. |
+| Remaining GitHub branches | `main` is the default release branch. `docs/hyderabad-maintainer` is reachable from main and retained pending consolidation. `feat/synthetic-staging-foundations` and `feat/hosted-synthetic-parity` retain the unmerged staging and hosted work. |
+| Public synthetic preview | `NOT_DEPLOYED`. No verified public URL. Production startup fails closed with the current gate. Provider calls, payments and outbound delivery remain disabled. |
+| Remaining V3 gaps | EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079 remain open in the evaluation register. |
+| AI and Paytm | The assistant uses deterministic ledger evidence. Live AI, multilingual speech and live Paytm remain separate approval and verification stages. The Paytm test contract uses synthetic evidence and cannot post payments. |
+
+The release candidate secures `/opt`, `/opt/microsoft` and `/opt/microsoft/msedge` on the disposable GitHub-hosted Ubuntu runner, then verifies the signed package, installed files and helper permissions before a sandboxed page-render check. CI now covers hosted, staging, the integration candidate and main, including the original demo’s loopback regression. The source verifier checks both the frozen source manifest and main’s maintainer-attributed revision. The Node server enforces the public gate even when launched directly.
+
+Local verification passed the frozen source and secret scan, 38 V3 reference tests, 10 provider staging tests, and 19 supplemental hosted tests using cached PGlite 0.5.12. The startup gate passed a negative test with the exact locked hosted production dependencies. The managed shell could not start Git Bash, connect to the PostgreSQL container engine, query advisory endpoints, or install all locked frontend/Python dependencies. The release candidate requires full CI on GitHub.
+
+Managed Git transport failed and the GitHub connector returned HTTP 403 on writes. From the repository root in the authenticated ordinary Windows PowerShell, run `pwsh -NoProfile -File ./.tmp/development/scripts/finalize_hyderabad_release.ps1`. The script checks exact refs, publishes the local tag and hosted candidate, waits for acceptance, verifies reviews and merge trees, and only cleans branches after verified main acceptance. The integration PR requires a repository reviewer to approve its exact head. For a future public preview, authorize a Node-capable HTTPS runtime with a private listener and a dedicated synthetic PostgreSQL 17 project with restricted access, TLS verification and durable backup/restore. Install separate migration and runtime credentials in the provider’s private settings. See `apps/hosted/deployment/README.md`.
+
+## Historical executive status before the full Edge hierarchy repair
 
 The published hackathon main release is 482e80a98a770b6e09786d52d754c4686efc6c37. [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) remains an open draft against feat/synthetic-staging-foundations. Its verified published head is a106c32e407978a8114516f81ef18bc44e8bcfc8. This repair is a direct child on feat/hosted-synthetic-parity and requires a new acceptance run after publication.
 
