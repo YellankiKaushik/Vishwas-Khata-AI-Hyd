@@ -50,11 +50,13 @@ def main():
     # The index is the publication set. New implementation files must be added
     # before this check; generated browser evidence remains untracked and private.
     paths = [name.decode() for name in git('ls-files', '-z').split(b'\0') if name]
-    prohibited = {'.git', '.tmp', '.venv', 'private', 'data', 'node_modules', 'dist', '__pycache__', 'test-results'}
+    prohibited = {'.git', '.tmp', '.venv', '.vercel', 'private', 'data', 'node_modules', 'dist', '__pycache__', 'test-results', 'playwright-report'}
+    private_suffixes = {'.pem', '.key', '.crt', '.pfx', '.p12', '.dump', '.trace', '.m4a', '.ogg'}
     for name in paths:
         p = Path(name)
         assert not prohibited.intersection(p.parts), name
         assert not (p.name.startswith('.env') and p.name != '.env.example'), name
+        assert p.suffix.lower() not in private_suffixes, name
         assert p.suffix.lower() not in {'.wav', '.mp3', '.mp4', '.db', '.sqlite', '.sqlite3', '.exe', '.dll', '.bundle', '.zip', '.png', '.jpg', '.pdf', '.pptx'}, name
         raw = (ROOT / name).read_bytes()
         raw.decode('utf-8')

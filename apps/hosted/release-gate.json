@@ -1,6 +1,7 @@
 {
   "mode": "SYNTHETIC_HOSTED_CANDIDATE",
   "public_deployment_allowed": false,
+  "restricted_vercel_preview_supported": true,
   "provider_calls_allowed": false,
   "payments_allowed": false,
   "outbound_messages_allowed": false,

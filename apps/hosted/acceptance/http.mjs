@@ -4,12 +4,13 @@ import { request } from 'node:https';
 
 const url = new URL(process.env.VISHWAS_HOSTED_TEST_URL);
 const origin = url.origin;
+const automation = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 function call(path, { method = 'GET', cookie, payload, headers = {}, status = 200 } = {}) {
   const body = payload === undefined ? undefined : JSON.stringify(payload);
   return new Promise((resolve, reject) => {
     const req = request(new URL(path, origin), {
       method, timeout: 10000,
-      headers: { origin, ...(cookie ? { cookie } : {}),
+      headers: { origin, ...(automation ? { 'x-vercel-protection-bypass': automation } : {}), ...(cookie ? { cookie } : {}),
         ...(body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } : {}),
         ...headers },
     }, res => {
@@ -33,10 +34,15 @@ function call(path, { method = 'GET', cookie, payload, headers = {}, status = 20
 
 const homepage = await call('/');
 assert.match(homepage.data, /<div id="root">/);
-const asset = /(?:src|href)="(\/assets\/[^"]+)"/.exec(homepage.data)?.[1];
-assert.ok(asset);
-await call(asset);
+const assets = [...homepage.data.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map(match => match[1]);
+assert.ok(assets.some(asset => asset.endsWith('.js')));
+assert.ok(assets.some(asset => asset.endsWith('.css')));
+await Promise.all(assets.map(asset => call(asset)));
 assert.equal((await call('/v1/health/ready')).data.status, 'ready');
+if (process.env.HOSTED_LOCAL_VERCEL_ACCEPTANCE === '1') {
+  assert.equal((await call('/api/merchant?__vishwas_route=health/ready')).data.status, 'ready');
+  console.log('Vercel adapter rewrite target verified through disposable HTTPS.');
+}
 await call('/v1/demo/session', { method: 'POST', headers: { origin: 'https://example.invalid' }, status: 403 });
 await call('/v1/demo/session', { method: 'POST', payload: { value: 'x'.repeat(8192) }, status: 413 });
 const sessions = await Promise.all([1, 2].map(() => call('/v1/demo/session', { method: 'POST', status: 201 })));

@@ -2,9 +2,20 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 test("two isolated browsers complete the hosted ledger and review workflow", async ({ browser, baseURL }) => {
+  const origin = new URL(baseURL!).origin;
+  const token = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   const desktop = await browser.newContext({ baseURL });
   const mobile = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 } });
   try {
+    if (token) {
+      for (const context of [desktop, mobile]) {
+        const bootstrap = await context.request.get("/", {
+          headers: { "x-vercel-protection-bypass": token, "x-vercel-set-bypass-cookie": "true" },
+          maxRedirects: 0,
+        });
+        expect(bootstrap.status()).toBeLessThan(400);
+      }
+    }
     const page = await desktop.newPage();
     const other = await mobile.newPage();
     const blocked: string[] = [];
@@ -27,23 +38,23 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     await other.getByRole("button", { name: "Open navigation" }).focus();
     await expect(other.getByRole("button", { name: "Open navigation" })).toBeFocused();
 
-    const headers = { origin: new URL(baseURL!).origin };
+    const headers = { origin };
     const request = desktop.request;
     const get = async (route: string) => {
-      const result = await request.get("/v1" + route);
+      const result = await request.get("/v1" + route, { maxRedirects: 0 });
       expect(result.ok()).toBeTruthy();
       return result.json();
     };
     const write = async (route: string, data: unknown, operation?: string, idempotency = false, status = 200) => {
-      const result = await request.post("/v1" + route, { data, headers: { ...headers,
+      const result = await request.post("/v1" + route, { data, maxRedirects: 0, headers: { ...headers,
         ...(operation ? { [idempotency ? "Idempotency-Key" : "Client-Operation-Id"]: operation } : {}) } });
       expect(result.status()).toBe(status);
       return result.json();
     };
     const merchant = await get("/merchants/me");
-    expect((await (await mobile.request.get("/v1/merchants/me")).json()).id).not.toBe(merchant.id);
+    expect((await (await mobile.request.get("/v1/merchants/me", { maxRedirects: 0 })).json()).id).not.toBe(merchant.id);
     const customer = (await get("/customers")).find((row: { display_name: string }) => row.display_name === "Ramesh");
-    expect((await mobile.request.get("/v1/customers/" + customer.id + "/balance")).status()).toBe(404);
+    expect((await mobile.request.get("/v1/customers/" + customer.id + "/balance", { maxRedirects: 0 })).status()).toBe(404);
 
     await page.getByRole("button", { name: "Record transaction" }).click();
     await expect(page.getByRole("dialog", { name: "Record a transaction" })).toBeVisible();
@@ -98,14 +109,15 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     expect(await financial(50000, "CREDIT_GIVEN")).toBe(70000);
     expect((await get("/commitments/" + commitment.id)).due_status).toBe("REVIEW_REQUIRED");
     const wrongTenant = await mobile.request.patch("/v1/commitments/" + commitment.id, {
+      maxRedirects: 0,
       headers: { ...headers, "Client-Operation-Id": randomUUID() },
       data: { expected_version: 1, expected_date: date, promised_amount_paise: 30000,
         reviewed_ledger_hash: "0".repeat(64), review_latest_ledger: true, reason: "Synthetic isolation witness" },
     });
     expect(wrongTenant.status()).toBe(404);
-    expect((await (await mobile.request.get("/v1/ledger/entries")).json()).items).toEqual([]);
-    expect((await request.delete("/v1/demo/session", { headers })).ok()).toBeTruthy();
-    expect((await request.get("/v1/merchants/me")).status()).toBe(401);
+    expect((await (await mobile.request.get("/v1/ledger/entries", { maxRedirects: 0 })).json()).items).toEqual([]);
+    expect((await request.delete("/v1/demo/session", { headers, maxRedirects: 0 })).ok()).toBeTruthy();
+    expect((await request.get("/v1/merchants/me", { maxRedirects: 0 })).status()).toBe(401);
     expect(blocked).toEqual([]);
     expect(runtimeErrors).toEqual([]);
   } finally {

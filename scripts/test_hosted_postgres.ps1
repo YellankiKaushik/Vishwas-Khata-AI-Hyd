@@ -38,7 +38,8 @@ Invoke-Checked $openssl @('req','-new','-x509','-newkey','rsa:2048','-nodes','-d
     '-addext','subjectAltName=DNS:localhost,IP:127.0.0.1','-out',$ca,'-keyout',$key)
 $names = @('HOSTED_DATABASE_CA','HOSTED_DATABASE_URL','HOSTED_MIGRATION_DATABASE_URL',
     'HOSTED_PUBLIC_ORIGIN','HOSTED_SESSION_SECRET','HOSTED_LOCAL_TLS_CERT_FILE','HOSTED_LOCAL_TLS_KEY_FILE',
-    'HOSTED_BIND_ADDRESS','HOSTED_WEB_DIST','PORT','VISHWAS_HOSTED_TEST_URL','NODE_EXTRA_CA_CERTS')
+    'HOSTED_BIND_ADDRESS','HOSTED_WEB_DIST','PORT','VISHWAS_HOSTED_TEST_URL','NODE_EXTRA_CA_CERTS',
+    'HOSTED_LOCAL_VERCEL_ACCEPTANCE')
 $previous = @{}
 foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $started = $false
@@ -97,6 +98,7 @@ CREATE DATABASE hyd_restored OWNER hyd_owner;
         $env:HOSTED_WEB_DIST = Join-Path $root 'apps/web/dist'
         $env:HOSTED_LOCAL_TLS_CERT_FILE = $ca
         $env:HOSTED_LOCAL_TLS_KEY_FILE = $key
+        if ($CiBrowser) { $env:HOSTED_LOCAL_VERCEL_ACCEPTANCE = '1' }
         $env:HOSTED_SESSION_SECRET = New-Password
         $env:NODE_EXTRA_CA_CERTS = $ca
         $log = Join-Path $work 'hosted.log'

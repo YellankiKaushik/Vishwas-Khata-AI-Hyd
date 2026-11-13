@@ -1,6 +1,8 @@
 import pg from 'pg';
 
-export function openDatabase(connectionString, ca, { migration = false } = {}) {
+export function openDatabase(connectionString, ca, {
+  migration = false, maxConnections = 5, idleTimeoutMillis = 10000,
+} = {}) {
   if (!connectionString || !ca) throw new Error('HOSTED_DATABASE_CONFIGURATION_REQUIRED');
   const url = new URL(connectionString);
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.username ||
@@ -10,7 +12,7 @@ export function openDatabase(connectionString, ca, { migration = false } = {}) {
   if (!migration && decodeURIComponent(url.username) !== 'hyd_runtime')
     throw new Error('HOSTED_RUNTIME_ROLE_REQUIRED');
   const pool = new pg.Pool({ connectionString, ssl: { ca, rejectUnauthorized: true },
-    max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000 });
+    max: maxConnections, connectionTimeoutMillis: 5000, idleTimeoutMillis });
   pool.on('error', () => console.error(JSON.stringify({ event: 'hosted_database_idle_error' })));
   return {
     pool,

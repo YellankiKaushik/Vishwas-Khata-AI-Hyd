@@ -85,7 +85,9 @@ jobs:
           grep -Fq HOSTED_PUBLIC_RELEASE_GATE_CLOSED <<< "$result"
       - name: Audit hosted npm lock
         if: "!cancelled()"
-        run: npm --prefix apps/hosted audit
+        run: |
+          npm --prefix apps/hosted audit
+          npm audit --omit=dev
 
   local-browser:
     if: github.repository == 'YellankiKaushik/Vishwas-Khata-AI-Hyd' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)

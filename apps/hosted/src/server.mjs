@@ -7,6 +7,7 @@ import { Readable } from 'node:stream';
 import { publicReleaseReady } from '../scripts/preflight.mjs';
 import { createHandler } from './handler.mjs';
 import { openDatabase } from './database.mjs';
+import { createVercelPreview } from './vercel-preview.mjs';
 
 const certificateFile = process.env.HOSTED_LOCAL_TLS_CERT_FILE;
 const keyFile = process.env.HOSTED_LOCAL_TLS_KEY_FILE;
@@ -22,9 +23,20 @@ if (localTLS && (!certificateFile || !keyFile || bindAddress !== '127.0.0.1' ||
 }
 const expectedHost = publicUrl.host;
 const root = resolve(process.env.HOSTED_WEB_DIST || '../web/dist');
-const { transact } = openDatabase(process.env.HOSTED_DATABASE_URL, process.env.HOSTED_DATABASE_CA);
-const handle = createHandler({ transact, origin, secret: process.env.HOSTED_SESSION_SECRET,
-  log: event => console.error(JSON.stringify(event)) });
+const log = event => console.error(JSON.stringify(event));
+const previewAcceptance = process.env.HOSTED_LOCAL_VERCEL_ACCEPTANCE === '1';
+let handle;
+if (previewAcceptance) {
+  if (!localTLS || process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted' ||
+      !/^[0-9a-f]{40}$/.test(process.env.GITHUB_SHA || '')) throw new Error('INVALID_VERCEL_ACCEPTANCE_CONFIGURATION');
+  handle = createVercelPreview({
+    env: { ...process.env, VERCEL: '1', VERCEL_ENV: 'preview',
+      VERCEL_GIT_COMMIT_SHA: process.env.GITHUB_SHA, HOSTED_PREVIEW_ACCEPTED_SHA: process.env.GITHUB_SHA },
+  });
+} else {
+  const { transact } = openDatabase(process.env.HOSTED_DATABASE_URL, process.env.HOSTED_DATABASE_CA);
+  handle = createHandler({ transact, origin, secret: process.env.HOSTED_SESSION_SECRET, log });
+}
 const mime = new Map([['.html', 'text/html; charset=utf-8'], ['.css','text/css; charset=utf-8'],
   ['.js','text/javascript; charset=utf-8'], ['.svg','image/svg+xml'], ['.png','image/png'],
   ['.ico','image/x-icon'], ['.woff2','font/woff2']]);
@@ -45,7 +57,7 @@ async function serve(req, res) {
       return;
     }
     const url = new URL(req.url, origin);
-    if (url.pathname.startsWith('/v1/')) {
+    if (url.pathname.startsWith('/v1/') || (previewAcceptance && url.pathname === '/api/merchant')) {
       const input = new Request(url, { method: req.method, headers: req.headers,
         ...(['GET', 'HEAD'].includes(req.method) ? {} :
           (req.headers['content-length'] === '0' || (!req.headers['content-length'] && !req.headers['transfer-encoding'])) ? {} :
