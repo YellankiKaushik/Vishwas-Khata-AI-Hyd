@@ -8,7 +8,14 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     const page = await desktop.newPage();
     const other = await mobile.newPage();
     const blocked: string[] = [];
+    const runtimeErrors: string[] = [];
     for (const tab of [page, other]) {
+      tab.on("pageerror", error => runtimeErrors.push(error.message));
+      tab.on("console", message => {
+        if (message.type() === "error" && !/Failed to load resource:.*(?:401|409)/.test(message.text())) {
+          runtimeErrors.push(message.text());
+        }
+      });
       tab.on("request", request => {
         if (["http:", "https:"].includes(new URL(request.url()).protocol) &&
             new URL(request.url()).origin !== new URL(baseURL!).origin) blocked.push(request.url());
@@ -90,10 +97,17 @@ test("two isolated browsers complete the hosted ledger and review workflow", asy
     await expect(page.getByText("Draft not sent", { exact: true })).toHaveCount(0);
     expect(await financial(50000, "CREDIT_GIVEN")).toBe(70000);
     expect((await get("/commitments/" + commitment.id)).due_status).toBe("REVIEW_REQUIRED");
+    const wrongTenant = await mobile.request.patch("/v1/commitments/" + commitment.id, {
+      headers: { ...headers, "Client-Operation-Id": randomUUID() },
+      data: { expected_version: 1, expected_date: date, promised_amount_paise: 30000,
+        reviewed_ledger_hash: "0".repeat(64), review_latest_ledger: true, reason: "Synthetic isolation witness" },
+    });
+    expect(wrongTenant.status()).toBe(404);
     expect((await (await mobile.request.get("/v1/ledger/entries")).json()).items).toEqual([]);
     expect((await request.delete("/v1/demo/session", { headers })).ok()).toBeTruthy();
     expect((await request.get("/v1/merchants/me")).status()).toBe(401);
     expect(blocked).toEqual([]);
+    expect(runtimeErrors).toEqual([]);
   } finally {
     await Promise.all([desktop.close(), mobile.close()]);
   }

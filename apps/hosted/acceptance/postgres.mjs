@@ -131,10 +131,38 @@ test('managed PostgreSQL private role, independent connections, concurrent repla
       await bind(db, b);
       return followup(db);
     }), /COMMITMENT_NOT_FOUND/);
-    assert.equal(await transact(async db => {
+    const update = reason => transact(async db => {
       await bind(db, a);
-      return query(db, 'SELECT count(*)::integer AS value FROM hyd_demo.commitment_events WHERE commitment_id=$1', [commitment]);
-    }), 1);
+      const evidence = await ledger(db);
+      return query(db, `SELECT hyd_demo.reviewed_commitment_change(
+        $1,$2,$3,'UPDATE',1,(statement_timestamp() AT TIME ZONE 'Asia/Kolkata')::date,
+        30000,$4,$5) AS value`, [customer, commitment, randomUUID(), evidence.ledger_hash, reason]);
+    });
+    const edits = await Promise.allSettled([update('First concurrent edit'), update('Second concurrent edit')]);
+    const winners = edits.filter(result => result.status === 'fulfilled');
+    const losers = edits.filter(result => result.status === 'rejected');
+    assert.equal(winners.length, 1);
+    assert.equal(winners[0].value.version, 2);
+    assert.equal(losers.length, 1);
+    assert.match(losers[0].reason.message, /VERSION_CONFLICT/);
+    const events = await transact(async db => {
+      await bind(db, a);
+      return (await db.query(`SELECT version, event_type FROM hyd_demo.commitment_events
+        WHERE commitment_id=$1 ORDER BY version`, [commitment])).rows;
+    });
+    assert.deepEqual(events, [{ version: 1, event_type: 'CREATED' }, { version: 2, event_type: 'UPDATED' }]);
+
+    const wrongCustomer = await transact(async db => {
+      await bind(db, a);
+      return query(db, 'SELECT customer_id AS value FROM hyd_demo.customers WHERE customer_id<>$1 LIMIT 1', [customer]);
+    });
+    await assert.rejects(transact(async db => {
+      await bind(db, a);
+      const evidence = await query(db, 'SELECT hyd_demo.ledger_evidence($1) AS value', [wrongCustomer]);
+      return query(db, `SELECT hyd_demo.reviewed_commitment_change(
+        $1,$2,$3,'CANCEL',2,NULL,NULL,$4,'Wrong customer') AS value`,
+        [wrongCustomer, commitment, randomUUID(), evidence.ledger_hash]);
+    }), /COMMITMENT_NOT_FOUND/);
     await transact(db => query(db, 'SELECT hyd_demo.revoke_demo_session($1) AS value', [b]));
     assert.equal(await transact(db => bind(db, b)), null);
 

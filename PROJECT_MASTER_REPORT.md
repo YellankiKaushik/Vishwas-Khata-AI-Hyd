@@ -2,6 +2,54 @@
 
 Updated 13 November 2026 (IST). The sections below record this implementation pass. The earlier release evidence and full V3 crosswalk follow as historical records.
 
+## Published branches and current verification
+
+GitHub confirmed both branches and both pull requests. The original main commit and venue release are intact. The hosted PR remains a draft against staging.
+
+| GitHub ref | Observed head | Review state |
+| --- | --- | --- |
+| main | 03d8192b989ae9d1da212f318ff172a919043830 | Historic source release, unchanged |
+| feat/synthetic-staging-foundations | 206e6cd02205987dadda1685134d2f2e14f46821 | Staging base, linked author YellankiKaushik |
+| docs/hyderabad-maintainer | 1deae905623b828a82c3916cc7061c3908b44b21 | [PR #1](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/1) open and unmerged, linked author YellankiKaushik |
+| feat/hosted-synthetic-parity | 50a3623651267df240ecf1d29204a0a967e892c7 | [PR #2](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/2) open as draft, linked author YellankiKaushik |
+
+GitHub lists only README.md and SOURCE_MANIFEST.json in PR #1. Its review asks the README to distinguish the Bengaluru predecessor from the Hyderabad entry. Local follow-up a5fb6b7217ae52a4a5d010100cf011f72670b237 clarifies that distinction and updates the manifest. Both archived trees passed 167 hash checks each. Push from the managed shell failed at DNS resolution. The documentation update is pending publication and review. No default-branch attribution or Contributors refresh is verified.
+
+### Acceptance run
+
+| Exact command | Exit | Observed result |
+| --- | --- | --- |
+| git -C .tmp/development fetch origin | 128 | Managed Git DNS failure. GitHub API verified the refs above. |
+| scripts/setup.ps1 -DependenciesOnly | 1 | Python 3.12.14 venv with bootstrap pip 25.0.1 could not download pinned pip 26.3. |
+| npm.cmd --prefix apps/hosted ci --fetch-retries=0 | 1 | npm registry DNS failure. PGlite 0.5.16 and pg 8.23.1 are locked. A clean install was unavailable. |
+| npm.cmd --prefix apps/web ci --fetch-retries=0 | 1 | npm install aborted in the network-restricted session. Frontend lock retained. Node 24.16.0 and npm 11.9.0 observed. |
+| Python 3.11.9 -X utf8 -m pytest -q tests/test_provider_staging.py Project_Vishwas_Khata_V3/tests | 0 | 48 passed, comprising 10 provider guard tests and 38 V3 reference tests. |
+| Python 3.11.9 -X utf8 -m pytest -q tests --tb=no | 2 | 15 collection errors in the backend suite after the dependency install failed. FastAPI 0.162.0 and pytest 9.2.0 remain pinned. |
+| node --test apps/hosted/tests/*.test.mjs | 0 | 18 passed with explicitly supplemental cached PGlite 0.5.12. The required PGlite 0.5.16 run remains open. |
+| npm.cmd --prefix apps/web test | 1 | Vitest executable unavailable. |
+| npm.cmd --prefix apps/web run test:e2e | 1 | tsc unavailable, so the Vite build and Edge run did not start. TypeScript 5.9.3 parsed the modified hosted spec successfully. |
+| npm.cmd --prefix apps/hosted audit --fetch-retries=0 | 1 | Audit endpoint DNS failure. |
+| .venv/Scripts/python.exe -m pip_audit -r requirements-lock.txt | 1 | Locked pip_audit 2.10.1 unavailable. |
+| Python 3.11.9 -X utf8 scripts/verify_release.py | 0 | Frozen 167-file manifest, 34 reference hashes and eight historic migrations passed. |
+| scripts/test_hosted_postgres.ps1 | 1 | Docker Desktop is installed. Starting it from the managed session did not expose the Linux engine. WSL returned E_ACCESSDENIED. No container was provisioned. |
+| node apps/hosted/scripts/preflight.mjs | 1 | Missing authorized runtime environment and external acceptance evidence. |
+
+The local hosted follow-up expands the disposable real PostgreSQL checks to race two edits against the same commitment version, verify exactly one new event, and reject a same-tenant wrong-customer mutation. The HTTPS smoke covers PostgreSQL-backed request limits and an expired cookie on the disposable restored database. The browser spec captures runtime errors and checks cross-tenant mutation denial. The API child process receives only the runtime database URL. The new acceptance paths passed syntax checks and still need execution against real services.
+
+### Remaining operator actions
+
+Run the following from the approved Windows checkout in ordinary PowerShell. Start Docker Desktop first and wait until docker info reports a Linux server.
+
+```powershell
+git -C .tmp/development push origin docs/hyderabad-maintainer
+Set-Location .tmp/development
+./scripts/verify_hosted_windows.ps1 -HostedBrowser
+```
+
+The verification runner reports exact command exit codes and refuses to run the hosted suite on a PGlite version other than 0.5.16. For the browser phase, it prints the disposable local certificate and keeps the loopback service running. In the Edge test profile that trusts that certificate, follow the printed command to run the hosted Playwright configuration. After acceptance, push the local hosted follow-up to PR #2. Review the amended documentation in PR #1, then merge it using a normal merge commit once its checks pass.
+
+Public HTTPS remains NOT_DEPLOYED. Public promotion needs an approved HTTPS runtime and dedicated synthetic PostgreSQL database, with separate runtime and migration credentials. The preflight is still closed. V3 classifications below remain in effect, including EV-059, EV-063, EV-064, EV-076, EV-077 and EV-079. The previous verification sections are historical records.
+
 ## Recovery and acceptance pass
 
 The approved Hyderabad checkout is clean on main. Its separate .tmp/development repository contains all four prior commits with their original object IDs and parents. The verified complete-history bundle is .tmp/hyderabad-recovered.bundle, SHA-256 F71FCEF27F944E383CDAA6D340EB2A03F6BAEEE40129129B3DD28EC8613FE945. The follow-up fixes are on feat/hosted-synthetic-parity, which still descends from the staging tip. The root release and earlier backups were preserved.

@@ -88,8 +88,14 @@ CREATE DATABASE hyd_restored OWNER hyd_owner;
         $env:NODE_EXTRA_CA_CERTS = $ca
         $log = Join-Path $work 'hosted.log'
         $node = (Get-Command node.exe).Source
-        $server = Start-Process -FilePath $node -WorkingDirectory (Join-Path $root 'apps/hosted') -ArgumentList 'src/server.mjs' `
-            -RedirectStandardOutput (Join-Path $work 'hosted-out.log') -RedirectStandardError $log -WindowStyle Hidden -PassThru
+        $migrationUrl = $env:HOSTED_MIGRATION_DATABASE_URL
+        try {
+            Remove-Item Env:HOSTED_MIGRATION_DATABASE_URL
+            $server = Start-Process -FilePath $node -WorkingDirectory (Join-Path $root 'apps/hosted') -ArgumentList 'src/server.mjs' `
+                -RedirectStandardOutput (Join-Path $work 'hosted-out.log') -RedirectStandardError $log -WindowStyle Hidden -PassThru
+        } finally {
+            $env:HOSTED_MIGRATION_DATABASE_URL = $migrationUrl
+        }
         $listening = $false
         for ($attempt = 0; $attempt -lt 20; $attempt++) {
             node -e "fetch(process.env.HOSTED_PUBLIC_ORIGIN+'/v1/health/ready',{signal:AbortSignal.timeout(2000)}).then(r=>{process.exitCode=r.ok?0:1},()=>{process.exitCode=1})"
@@ -98,7 +104,7 @@ CREATE DATABASE hyd_restored OWNER hyd_owner;
             Start-Sleep -Seconds 1
         }
         if (!$listening) { throw "The loopback HTTPS service did not become ready. See $log" }
-        Invoke-Checked node @('apps/hosted/acceptance/http.mjs')
+        Invoke-Checked node @('apps/hosted/acceptance/http.mjs','--expire-disposable-session')
         Write-Output "For Edge acceptance, trust the local certificate at $ca in the test profile before continuing."
         Write-Output "In that profile's terminal, set VISHWAS_HOSTED_TEST_URL=$env:VISHWAS_HOSTED_TEST_URL and run Playwright with playwright.hosted.config.ts from apps/web."
         [void](Read-Host 'Press Enter after Edge acceptance to stop the disposable services')
