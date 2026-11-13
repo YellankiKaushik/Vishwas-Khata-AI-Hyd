@@ -14,7 +14,7 @@ class Settings:
     database_path: Path = ROOT / 'data/vishwas.sqlite3'
     demo_mode: bool = True
     voice_provider: str = 'mock'
-    sarvam_api_key: str = ''
+    sarvam_api_key: str = field(default='', repr=False)
     sarvam_live_verified: bool = False
     sarvam_tts_verified: bool = False
     sarvam_stt_languages: tuple[str, ...] = ()
@@ -22,6 +22,8 @@ class Settings:
     as_of: str | None = None
     hyd_enabled: bool = True
     hyd_live_approval: str = ''
+    hyd_assistant_provider: str = 'deterministic'
+    hyd_assistant_model: str = 'gpt-4.1-mini'
     hyd_assistant_key: str = field(default='', repr=False)
 
     @classmethod
@@ -38,8 +40,11 @@ class Settings:
             sarvam_tts_languages=tuple(x.strip() for x in os.getenv('SARVAM_TTS_LANGUAGES', '').split(',') if x.strip() in ('en-IN', 'hi-IN', 'te-IN')),
             as_of=os.getenv('VISHWAS_AS_OF') or None,
             hyd_enabled=os.getenv('HYDERABAD_ENABLED', 'true').lower() == 'true',
+            hyd_assistant_provider=os.getenv('HYDERABAD_ASSISTANT_PROVIDER', 'deterministic'),
+            hyd_assistant_model=os.getenv('HYDERABAD_ASSISTANT_MODEL', 'gpt-4.1-mini'),
             hyd_live_approval=os.getenv('HYDERABAD_LIVE_ASSISTANT_APPROVAL', '')
-            if os.getenv('HYDERABAD_LIVE_ASSISTANT_ENABLED', 'false').lower() == 'true' else '',
+            if (os.getenv('HYDERABAD_LIVE_ASSISTANT_ENABLED', 'false').lower() == 'true'
+                and os.getenv('HYDERABAD_ASSISTANT_PROVIDER', 'deterministic') == 'openai') else '',
             hyd_assistant_key=os.getenv('HYDERABAD_ASSISTANT_API_KEY', ''),
         )
 
