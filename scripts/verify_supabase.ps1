@@ -39,11 +39,14 @@ try {
 import { databaseTarget } from './apps/hosted/src/database.mjs';
 const runtime = databaseTarget(process.env.HOSTED_DATABASE_URL);
 const migration = databaseTarget(process.env.HOSTED_MIGRATION_DATABASE_URL, { migration: true });
+const { hostname: runtimeHost } = new URL(process.env.HOSTED_DATABASE_URL);
+const { hostname: migrationHost } = new URL(process.env.HOSTED_MIGRATION_DATABASE_URL);
 if (!runtime.transactionPooler || !runtime.supabase || !migration.supabase ||
     runtime.project !== 'xzsccwmljyckbmjcfang' || runtime.project !== migration.project ||
-    !new URL(process.env.HOSTED_DATABASE_URL).hostname.endsWith('.pooler.supabase.com')) process.exit(1);
+    !runtimeHost.endsWith('.pooler.supabase.com') ||
+    (migrationHost.endsWith('.pooler.supabase.com') && migrationHost !== runtimeHost)) process.exit(1);
 '@
-    Invoke-PrivateCheck 'Supabase project and endpoint validation' @('--input-type=module', '-e', $validate)
+    Invoke-PrivateCheck 'Supabase project and endpoint validation' @('--input-type=module', '-e', ($validate -replace '\r?\n', ' '))
     Invoke-PrivateCheck 'Verified TLS migration and grants' @('apps/hosted/scripts/migrate.mjs')
     Invoke-PrivateCheck 'Migration checksum replay' @('apps/hosted/scripts/migrate.mjs')
     Invoke-PrivateCheck 'TLS runtime role, tenant isolation, concurrency and stale evidence' @('--test', 'apps/hosted/acceptance/postgres.mjs')

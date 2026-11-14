@@ -2,7 +2,11 @@
 
 ## Supabase integration status - 14 November 2026 (IST)
 
-The Supabase candidate is on local branch `release/supabase-pooler`, based on verified GitHub `main` at `ee22f382fd5129b7087f0d857f2ab72bbf4f510c`. The managed GitHub CLI returned HTTP 401 and the connector denied repository writes. The Supabase PR, candidate CI, merge and post-merge verification are pending. GitHub currently has only `main`. The existing venue tag still resolves to its frozen release.
+[PR #4](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/pull/4) is open from `release/supabase-pooler` into `main` at `ee22f382fd5129b7087f0d857f2ab72bbf4f510c`. Those are the two remote branches. The venue tag still resolves to the frozen release.
+
+[Run 43538153968](https://github.com/YellankiKaushik/Vishwas-Khata-AI-Hyd/actions/runs/43538153968) passed 239 backend tests, 38 V3 tests, 24 hosted unit tests, hosted Chromium, and 28 local Chromium tests with one skip. The Python audit failed on CVE-2026-126360 in OpenTelemetry API 1.45.1. The local correction pins 1.45.2, which meets FastAPI's minimum 1.44.0. Publication and acceptance for the corrected SHA are pending.
+
+All 55 patched lock pins installed in isolation and passed `pip check`. The audit of the complete pinned list found no known vulnerabilities. The local patched run passed 239 backend tests, 38 V3 tests, a FastAPI request and a trace-context smoke check. PowerShell 5.1 fixture runs verified the PR #4 update, resume and unexpected-head guards. Managed GitHub authentication returned HTTP 401. The downloaded Supabase Root 2021 CA parsed successfully. Endpoint TLS and managed migrations still require private credentials.
 
 - The [provisioning SQL](apps/hosted/deployment/supabase-provision.sql) creates separate schema-scoped migration and runtime roles. Use the SQL Editor for project `xzsccwmljyckbmjcfang` and set passwords separately. Runtime connects through shared transaction pooling with verified TLS and a pool cap of two. Migration uses the separate session or direct connection. The original four migration files and their checksums are preserved.
 - The locked local suite passed 24 hosted tests on PGlite 0.5.16, including provisioning twice, migration replay and checksum drift rejection. All 239 backend and 38 V3 tests passed in the supplemental Windows run. The V3 verifier, 11 frontend tests, TypeScript/Vite build and npm audits passed.

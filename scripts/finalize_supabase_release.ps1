@@ -8,6 +8,8 @@ if ($PSVersionTable.PSVersion.Major -ge 7) { $PSNativeCommandUseErrorActionPrefe
 $repo = 'YellankiKaushik/Vishwas-Khata-AI-Hyd'
 $branch = 'release/supabase-pooler'
 $base = 'ee22f382fd5129b7087f0d857f2ab72bbf4f510c'
+$original = 'c721d5d56f4ccacefec5ab185635e32251da09ed'
+$number = 4
 $tag = 'hyderabad-venue-2026-11-13'
 
 function Git {
@@ -27,6 +29,22 @@ function RemoteRef([string]$Ref) {
 }
 function Assert-Same($Actual, $Expected, [string]$Label) {
     if ($Actual -cne $Expected) { throw "Unexpected $Label. Expected $Expected, got $Actual." }
+}
+function Assert-Candidate {
+    Assert-Same (Git rev-parse HEAD) $ExpectedHead 'local commit'
+    if ($ExpectedHead -ceq $original) { throw 'Use the corrected candidate SHA.' }
+    Git merge-base --is-ancestor $base $ExpectedHead
+    Git merge-base --is-ancestor $original $ExpectedHead
+}
+
+function Get-ReleasePr {
+    $pr = Api "pulls/$number"
+    Assert-Same $pr.number $number 'PR number'
+    Assert-Same $pr.head.ref $branch 'PR head branch'
+    Assert-Same $pr.head.repo.full_name $repo 'PR head repository'
+    Assert-Same $pr.base.ref 'main' 'PR base branch'
+    Assert-Same $pr.base.repo.full_name $repo 'PR base repository'
+    $pr
 }
 function Wait-Acceptance([string]$Sha, [string]$Branch) {
     $deadline = [DateTimeOffset]::UtcNow.AddMinutes(35)
@@ -48,10 +66,10 @@ function Wait-Acceptance([string]$Sha, [string]$Branch) {
     throw "Timed out waiting for CI at $Sha. Rerun to resume."
 }
 
-function Remove-MergedBranch {
+function Push-CheckedRef([string]$OldSha, [switch]$Delete) {
     $existingHook = Git rev-parse --git-path hooks/pre-push
-    if (Test-Path -LiteralPath $existingHook) { throw 'An existing pre-push hook requires manual branch cleanup.' }
-    $hooks = Join-Path $env:TEMP ('supabase-cleanup-' + [guid]::NewGuid().ToString('N'))
+    if (Test-Path -LiteralPath $existingHook) { throw 'An existing pre-push hook requires manual inspection before publishing.' }
+    $hooks = Join-Path $env:TEMP ('supabase-push-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $hooks | Out-Null
     $hook = Join-Path $hooks 'pre-push'
     try {
@@ -59,13 +77,17 @@ function Remove-MergedBranch {
 #!/bin/sh
 set -eu
 IFS=' ' read -r local_ref local_oid remote_ref remote_oid
-test "$local_ref" = '(delete)'
+test "$local_oid" = '{2}'
 test "$remote_ref" = 'refs/heads/{0}'
 test "$remote_oid" = '{1}'
 if read -r extra; then exit 1; fi
-'@ -f $branch, $ExpectedHead
+'@ -f $branch, $OldSha, $(if ($Delete) { '0' * 40 } else { $ExpectedHead })
         [IO.File]::WriteAllText($hook, (($guard -replace '\r\n', "`n") + "`n"), [Text.UTF8Encoding]::new($false))
-        Git -c "core.hooksPath=$hooks" push origin --delete $branch
+        if ($Delete) {
+            Git -c "core.hooksPath=$hooks" push origin --delete $branch
+        } else {
+            Git -c "core.hooksPath=$hooks" push origin "${ExpectedHead}:refs/heads/$branch"
+        }
     } finally {
         if (Test-Path -LiteralPath $hook) { Remove-Item -LiteralPath $hook }
         Remove-Item -LiteralPath $hooks
@@ -76,8 +98,7 @@ Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
     Assert-Same (Git config --get remote.origin.url) "https://github.com/$repo.git" 'repository'
     Assert-Same (Git branch --show-current) $branch 'local branch'
-    Assert-Same (Git rev-parse HEAD) $ExpectedHead 'local commit'
-    Assert-Same (Git show -s --format=%P HEAD) $base 'candidate parent'
+    Assert-Candidate
     if (Git status --porcelain) { throw 'Use a clean development checkout.' }
     Assert-Same (Gh api user --jq '.login') 'YellankiKaushik' 'GitHub account'
     $repoInfo = (Gh api "repos/$repo" | Out-String) | ConvertFrom-Json
@@ -87,23 +108,25 @@ try {
     $tagObject = Git rev-parse $tagRef
     Assert-Same (Git rev-parse "${tagRef}^{commit}") '03d8192b989ae9d1da212f318ff172a919043830' 'venue tag target'
     Assert-Same (RemoteRef $tagRef) $tagObject 'published venue tag'
-    $numbers = @(Gh pr list --repo $repo --base main --head $branch --state all --json number --jq '.[].number')
-    if ($numbers.Count -gt 1) { throw 'Multiple candidate PRs need review.' }
-    if ($numbers.Count -eq 0) {
-        Assert-Same (RemoteRef 'refs/heads/main') $base 'main'
-        $published = RemoteRef "refs/heads/$branch"
-        if (!$published) { Git push origin "${ExpectedHead}:refs/heads/$branch" }
-        Assert-Same (RemoteRef "refs/heads/$branch") $ExpectedHead 'published candidate'
-        $url = Gh pr create --repo $repo --base main --head $branch --title 'Support Supabase PostgreSQL pooling for the synthetic preview' --body 'Adds validated Supabase connection settings, schema-scoped provisioning and acceptance checks. The public gate stays closed.'
-        $numbers = @([int]($url -split '/')[-1])
-    }
-    $number = $numbers[0]
-    $pr = Api "pulls/$number"
-    Assert-Same $pr.head.sha $ExpectedHead 'PR head'
-    Assert-Same $pr.head.repo.full_name $repo 'PR head repository'
-    Assert-Same $pr.base.ref 'main' 'PR base'
+    $pr = Get-ReleasePr
     Write-Host $pr.html_url
+    if (!$pr.merged) {
+        Assert-Same $pr.state 'open' 'PR state'
+        Assert-Same $pr.draft $false 'draft state'
+        Assert-Same $pr.base.sha $base 'PR base commit'
+        Assert-Same (RemoteRef 'refs/heads/main') $base 'main before publication'
+        $published = RemoteRef "refs/heads/$branch"
+        Assert-Same $pr.head.sha $published 'PR and published head'
+        if ($published -ceq $original) {
+            Push-CheckedRef $original
+        }
+        Assert-Same (RemoteRef "refs/heads/$branch") $ExpectedHead 'published candidate'
+    } else {
+        Assert-Same $pr.head.sha $ExpectedHead 'merged PR head'
+    }
     Wait-Acceptance $ExpectedHead $branch
+    $pr = Get-ReleasePr
+    Assert-Same $pr.head.sha $ExpectedHead 'PR head after acceptance'
     if (!$pr.merged) {
         Assert-Same $pr.state 'open' 'PR state'
         Assert-Same $pr.draft $false 'draft state'
@@ -119,9 +142,10 @@ try {
         Assert-Same (RemoteRef 'refs/heads/main') $base 'main at merge'
         $result = (Gh api --method PUT "repos/$repo/pulls/$number/merge" -f merge_method=merge -f "sha=$ExpectedHead" | Out-String) | ConvertFrom-Json
         Assert-Same $result.merged $true 'merge result'
-        $pr = Api "pulls/$number"
+        $pr = Get-ReleasePr
     }
     Assert-Same $pr.merged $true 'merged PR'
+    Assert-Same $pr.head.sha $ExpectedHead 'merged PR head'
     $main = $pr.merge_commit_sha
     Assert-Same (RemoteRef 'refs/heads/main') $main 'merged main'
     Git fetch --no-tags origin main
@@ -136,7 +160,7 @@ try {
             if (($line -split "`t") -ccontains $branch) { throw 'An open PR still uses the branch.' }
         }
         Assert-Same (RemoteRef 'refs/heads/main') $main 'main before cleanup'
-        Remove-MergedBranch
+        Push-CheckedRef $ExpectedHead -Delete
     }
     if (RemoteRef "refs/heads/$branch") { throw 'Branch deletion was not verified.' }
     Assert-Same (RemoteRef $tagRef) $tagObject 'venue tag'
