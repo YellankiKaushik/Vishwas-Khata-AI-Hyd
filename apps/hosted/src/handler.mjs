@@ -307,13 +307,49 @@ const conflicts = new Set(['IDEMPOTENCY_CONFLICT','VERSION_CONFLICT','DRAFT_EXPI
 const missing = new Set(['CUSTOMER_NOT_FOUND','DRAFT_NOT_FOUND','COMMITMENT_NOT_FOUND','REVERSIBLE_ENTRY_NOT_FOUND']);
 function safeError(error) {
   if (error instanceof RequestError) return error;
-  if (conflicts.has(error.message)) return new RequestError(409, error.message, 'Review the latest recorded data and retry with the correct details.');
-  if (missing.has(error.message) || error.code === '23503') return new RequestError(404, 'RECORD_NOT_FOUND', 'The record was not found in this demo session.');
-  if (error.code === '23505') return new RequestError(409, 'CONFLICT', 'The requested change conflicts with an existing record.');
-  if (['INVALID_PROMISE_AMOUNT','EXPLICIT_REVIEW_REQUIRED','INVALID_REASON'].includes(error.message) || error.code === '22023')
+  const { code, message } = error ?? {};
+  if (conflicts.has(message)) return new RequestError(409, message, 'Review the latest recorded data and retry with the correct details.');
+  if (missing.has(message) || code === '23503') return new RequestError(404, 'RECORD_NOT_FOUND', 'The record was not found in this demo session.');
+  if (code === '23505') return new RequestError(409, 'CONFLICT', 'The requested change conflicts with an existing record.');
+  if (['INVALID_PROMISE_AMOUNT','EXPLICIT_REVIEW_REQUIRED','INVALID_REASON'].includes(message) || code === '22023')
     return new RequestError(422, 'INVALID_INPUT', 'Review the required fields and try again.');
   return new RequestError(503, 'UNAVAILABLE', 'The demo service is temporarily unavailable.');
 }
+
+const databaseFailureCodes = new Map(Object.entries({
+  DATABASE_AUTH_FAILURE: ['28000', '28P01'],
+  DATABASE_NETWORK_FAILURE: ['08000', '08001', '08003', '08004', '08006', '57P01', '57P03', '53300',
+    'EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH'],
+  DATABASE_TIMEOUT: ['ETIMEDOUT', 'ESOCKETTIMEDOUT'],
+  DATABASE_TLS_FAILURE: ['ERR_TLS_CERT_ALTNAME_INVALID', 'CERT_HAS_EXPIRED', 'CERT_NOT_YET_VALID',
+    'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    'UNABLE_TO_GET_ISSUER_CERT', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'ERR_OSSL_PEM_NO_START_LINE',
+    'ERR_OSSL_PEM_BAD_BASE64_DECODE', 'ERR_SSL_WRONG_VERSION_NUMBER'],
+  DATABASE_SCHEMA_FAILURE: ['3F000', '42501', '42703', '42883', '42P01'],
+}).flatMap(([category, codes]) => codes.map(code => [code, { category, code }])));
+
+const databaseFailureMessages = new Map([
+  ['HOSTED_DATABASE_CONFIGURATION_REQUIRED', { category: 'DATABASE_CONFIGURATION_FAILURE', code: 'HOSTED_DATABASE_CONFIGURATION_REQUIRED' }],
+  ['HOSTED_DATABASE_CONFIGURATION_INVALID', { category: 'DATABASE_CONFIGURATION_FAILURE', code: 'HOSTED_DATABASE_CONFIGURATION_INVALID' }],
+  ['HOSTED_SUPABASE_CONFIGURATION_INVALID', { category: 'DATABASE_CONFIGURATION_FAILURE', code: 'HOSTED_SUPABASE_CONFIGURATION_INVALID' }],
+  ['HOSTED_RUNTIME_ROLE_REQUIRED', { category: 'DATABASE_ROLE_GUARD_FAILURE', code: 'HOSTED_RUNTIME_ROLE_REQUIRED' }],
+  ['timeout exceeded when trying to connect', { category: 'DATABASE_TIMEOUT', code: 'PG_POOL_TIMEOUT' }],
+  ['Connection terminated due to connection timeout', { category: 'DATABASE_TIMEOUT', code: 'PG_POOL_TIMEOUT' }],
+  ['Connection terminated unexpectedly', { category: 'DATABASE_NETWORK_FAILURE', code: 'PG_CONNECTION_TERMINATED' }],
+  ['The server does not support SSL connections', { category: 'DATABASE_TLS_FAILURE', code: 'PG_SSL_UNSUPPORTED' }],
+]);
+
+function unavailableDiagnostic(error) {
+  if (error instanceof RequestError && error.code === 'NOT_READY') {
+    return { category: 'DATABASE_SCHEMA_FAILURE', code: 'NOT_READY' };
+  }
+  if (error?.code === '57014' && error.message === 'canceling statement due to statement timeout') {
+    return { category: 'DATABASE_TIMEOUT', code: '57014' };
+  }
+  return databaseFailureCodes.get(error?.code) ?? databaseFailureMessages.get(error?.message) ??
+    { category: 'UNKNOWN_INTERNAL_FAILURE' };
+}
+
 function response(data, status = 200, cookie) {
   const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer', 'Cross-Origin-Resource-Policy': 'same-origin',
@@ -396,7 +432,8 @@ export function createHandler({ transact, origin, secret, log = () => {} }) {
     } catch (error) {
       const failure = safeError(error);
       const requestId = randomUUID();
-      if (failure.status === 503) log({ event: 'hosted_request_unavailable', request_id: requestId });
+      if (failure.status === 503) log({ event: 'hosted_request_unavailable', request_id: requestId,
+        ...unavailableDiagnostic(error) });
       return response({ error: { code: failure.code, message: failure.message, request_id: requestId } }, failure.status);
     }
   };
