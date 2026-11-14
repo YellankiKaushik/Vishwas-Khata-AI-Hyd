@@ -68,6 +68,7 @@ const privateError = code => Object.assign(new Error(privateText), {
 test('Vercel readiness reports only allowlisted database diagnostics and a matching request ID', async () => {
   const cases = [
     [privateError('28P01'), 'DATABASE_AUTH_FAILURE', '28P01'],
+    [privateError('08005'), 'DATABASE_NETWORK_FAILURE', '08005'],
     [privateError('08006'), 'DATABASE_NETWORK_FAILURE', '08006'],
     [privateError('ENOTFOUND'), 'DATABASE_NETWORK_FAILURE', 'ENOTFOUND'],
     [privateError('ETIMEDOUT'), 'DATABASE_TIMEOUT', 'ETIMEDOUT'],
@@ -145,6 +146,9 @@ test('Vercel logs a readiness schema failure while preserving stale-evidence rej
     }),
   }));
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).error.code, 'STALE_EVIDENCE');
+  const stale = await response.json();
+  assert.match(stale.error.request_id, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(stale, { error: { code: 'STALE_EVIDENCE',
+    message: 'Review the latest recorded data and retry with the correct details.', request_id: stale.error.request_id } });
   assert.equal(logs.length, 1);
 });
