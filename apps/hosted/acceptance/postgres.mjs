@@ -18,14 +18,28 @@ test('managed PostgreSQL private role, independent connections, concurrent repla
   const tenantA = await open(a);
   const tenantB = await open(b);
   try {
-    const [one, two] = await Promise.all([pool.connect(), pool.connect()]);
+    // A transaction pooler can reuse one backend for sequential autocommit queries.
+    // Hold both transactions open to witness two independent backend connections.
+    let release;
+    const ready = new Promise(resolve => { release = resolve; });
+    const pids = [];
+    const check = db => query(db, 'SELECT pg_backend_pid() AS value').then(async pid => {
+      pids.push(pid);
+      if (pids.length === 2) release();
+      await ready;
+    });
+    const concurrent = transact(check).finally(release);
+    const second = transact(check).finally(release);
     try {
-      const pid = client => query(client, 'SELECT pg_backend_pid() AS value');
-      assert.notEqual(await pid(one), await pid(two));
+      await Promise.all([concurrent, second]);
+      assert.equal(pids.length, 2);
+      assert.notEqual(...pids);
     } finally {
-      one.release();
-      two.release();
+      release();
+      await Promise.allSettled([concurrent, second]);
     }
+    assert.equal(await transact(db => query(db, 'SELECT count(*)::int AS value FROM hyd_demo.customers')), 0,
+      'An unbound transaction must see no tenant rows');
 
     const owner = await transact(db => query(db, `SELECT r.rolname AS value
       FROM pg_namespace n JOIN pg_roles r ON r.oid=n.nspowner

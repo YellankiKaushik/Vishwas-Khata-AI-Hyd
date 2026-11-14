@@ -1,7 +1,7 @@
 -- Run as hyd_demo's non-superuser owner after migrations. Provision hyd_runtime
 -- as a private LOGIN with no role memberships, ownership or BYPASSRLS beforehand.
-REVOKE ALL ON ALL TABLES IN SCHEMA hyd_demo FROM hyd_runtime;
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA hyd_demo FROM hyd_runtime;
+REVOKE ALL ON ALL TABLES IN SCHEMA hyd_demo FROM PUBLIC, hyd_runtime;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA hyd_demo FROM PUBLIC, hyd_runtime;
 GRANT USAGE ON SCHEMA hyd_demo TO hyd_runtime;
 GRANT SELECT ON hyd_demo.customers, hyd_demo.journal, hyd_demo.commitments,
     hyd_demo.commitment_events, hyd_demo.confirmation_receipts TO hyd_runtime;

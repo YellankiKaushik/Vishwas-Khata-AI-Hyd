@@ -1,7 +1,7 @@
 name: Hosted synthetic acceptance
 on:
   push:
-    branches: [main, feat/synthetic-staging-foundations, feat/hosted-synthetic-parity, release/hyderabad-integration]
+    branches: [main, feat/synthetic-staging-foundations, feat/hosted-synthetic-parity, release/hyderabad-integration, release/supabase-pooler]
   pull_request:
     branches: [main, feat/synthetic-staging-foundations]
   workflow_dispatch:
